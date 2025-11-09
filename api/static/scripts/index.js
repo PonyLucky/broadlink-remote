@@ -12,7 +12,7 @@ const viewFancyBtn = $('#viewFancyBtn');
 const viewListBtn = $('#viewListBtn');
 const commandsPanel = $('#commandsPanel');
 const commandsView = $('#commandsView');
-const controllerSvg = $('#controllerSvg');
+const viewContainer = $('#viewContainer');
 
 // Modal elements
 const filtersBtn = $('#filtersBtn');
@@ -448,39 +448,144 @@ function isFancyActive() {
   return !!(viewFancyBtn && viewFancyBtn.classList.contains('active'));
 }
 
-function clearSvg(svg) {
-  if (!svg) return;
-  while (svg.firstChild) svg.removeChild(svg.firstChild);
-}
-
 function updateFancyView() {
-  if (!commandsView) return;
+  if (!commandsView || !viewContainer) return;
   const controller = decodeURIComponent(controllerSel?.value || '');
   const devices = getSelectedDevices();
-  // Prepare empty placeholder SVG for now
-  if (controllerSvg) {
-    clearSvg(controllerSvg);
-    controllerSvg.setAttribute('viewBox', '0 0 100 100');
-    // If an external view renderer is provided later, use it
-    if (window.ControllerView && typeof window.ControllerView.render === 'function') {
-      try {
-        window.ControllerView.render({ controller, devices, svg: controllerSvg });
-      } catch (e) {
-        console.error('ControllerView.render error:', e);
-      }
-    } else {
-      const ns = 'http://www.w3.org/2000/svg';
-      const text = document.createElementNS(ns, 'text');
-      text.setAttribute('x', '50');
-      text.setAttribute('y', '50');
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('dominant-baseline', 'middle');
-      text.setAttribute('fill', '#94a3b8');
-      text.setAttribute('font-size', '6');
-      text.textContent = controller ? `Fancy view for ${controller}` : 'Fancy view';
-      controllerSvg.appendChild(text);
+  viewContainer.innerHTML = '';
+  if (!controller || !devices.length) {
+    const p = document.createElement('p');
+    p.className = 'muted';
+    p.textContent = 'Select a controller and one or more devices to see the fancy view.';
+    viewContainer.appendChild(p);
+    return;
+  }
+
+  // Helper to flatten commands with coords
+  function eachPositionedCommand(data, cb, groupPath = []) {
+    const pushCmd = (cmd, name) => {
+      const hasAll = ['x','y','width','height'].every(k => Object.prototype.hasOwnProperty.call(cmd, k));
+      if (!hasAll) return;
+      cb({
+        path: [...groupPath, name].join('.'),
+        disabled: !!cmd.disabled,
+        x: cmd.x, y: cmd.y, width: cmd.width, height: cmd.height,
+      });
+    };
+    (data.commands || []).forEach(c => pushCmd(c, c.name));
+    (data.groups || []).forEach(g => {
+      (g.commands || []).forEach(c => pushCmd(c, c.name));
+      (g.groups || []).forEach(sg => {
+        // recurse two+ levels
+        eachPositionedGroup(sg, [...groupPath, g.name]);
+      });
+    });
+    function eachPositionedGroup(group, gpath) {
+      (group.commands || []).forEach(c => pushCmd(c, c.name));
+      (group.groups || []).forEach(sg => eachPositionedGroup(sg, [...gpath, group.name]));
     }
   }
+
+  const showDisabled = !!showDisabledChk.checked;
+
+  // Render each device panel
+  devices.forEach(async (dName) => {
+    const panel = document.createElement('div');
+    panel.className = 'device-view';
+    const header = document.createElement('div');
+    header.className = 'device-title';
+    header.textContent = dName;
+    panel.appendChild(header);
+
+    const canvas = document.createElement('div');
+    canvas.className = 'device-canvas';
+    canvas.setAttribute('data-device', dName);
+
+    const img = document.createElement('img');
+    img.alt = dName;
+    img.className = 'device-image';
+    canvas.appendChild(img);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'device-overlay';
+    canvas.appendChild(overlay);
+
+    viewContainer.appendChild(panel);
+    panel.appendChild(canvas);
+
+    try {
+      const data = await fetchJSON(`/${encodeURIComponent(controller)}/${encodeURIComponent(dName)}`);
+      header.textContent = `${data.friendly_name || data.device || dName}`;
+      if (!data.image) {
+        const note = document.createElement('p');
+        note.className = 'muted';
+        note.textContent = 'No image defined for this device. Fancy view is unavailable.';
+        canvas.appendChild(note);
+        return;
+      }
+      img.src = data.image;
+
+      const positioned = [];
+      // Walk tree and collect with coords
+      const collect = [];
+      const walk = (node, path=[]) => {
+        (node.commands || []).forEach(c => {
+          const hasAll = ['x','y','width','height'].every(k => Object.prototype.hasOwnProperty.call(c, k));
+          if (hasAll) collect.push({ path: [...path, c.name].join('.'), disabled: !!c.disabled, x: c.x, y: c.y, width: c.width, height: c.height });
+        });
+        (node.groups || []).forEach(g => walk(g, [...path, g.name]));
+      };
+      walk(data, []);
+
+      collect.forEach(c => { if (showDisabled || !c.disabled) positioned.push(c); });
+
+      if (!positioned.length) {
+        const note = document.createElement('p');
+        note.className = 'muted';
+        note.textContent = 'No positioned commands for this device.';
+        canvas.appendChild(note);
+        return;
+      }
+
+      function renderButtons() {
+        // clear overlay
+        overlay.innerHTML = '';
+        const naturalW = img.naturalWidth || img.width; // fallback
+        const naturalH = img.naturalHeight || img.height;
+        if (!naturalW || !naturalH) return;
+        const scaleX = img.clientWidth / naturalW;
+        const scaleY = img.clientHeight / naturalH;
+        positioned.forEach(cmd => {
+          const btn = document.createElement('button');
+          btn.className = 'hit' + (cmd.disabled ? ' disabled' : '');
+          const left = Math.round(cmd.x * scaleX);
+          const top = Math.round(cmd.y * scaleY);
+          const w = Math.round(cmd.width * scaleX);
+          const h = Math.round(cmd.height * scaleY);
+          btn.style.left = left + 'px';
+          btn.style.top = top + 'px';
+          btn.style.width = w + 'px';
+          btn.style.height = h + 'px';
+          btn.title = cmd.path + (cmd.disabled ? ' (disabled)' : '');
+          btn.disabled = !!cmd.disabled;
+          btn.addEventListener('click', () => sendCommand(controller, dName, cmd.path));
+          overlay.appendChild(btn);
+        });
+      }
+
+      if (img.complete) {
+        renderButtons();
+      }
+      img.addEventListener('load', () => renderButtons());
+      window.addEventListener('resize', renderButtons);
+
+    } catch (e) {
+      const err = document.createElement('p');
+      err.className = 'error';
+      err.textContent = e.message;
+      panel.appendChild(err);
+    }
+  });
 }
 
 // Bind view buttons

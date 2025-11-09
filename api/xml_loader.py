@@ -50,6 +50,7 @@ class Config:
                     type=d_el.get('type') or 'ir',
                     manufacturer=d_el.get('manifacturer') or d_el.get('manufacturer'),
                     model=d_el.get('model'),
+                    image_src=(d_el.find('image').get('src') if d_el.find('image') is not None else None),
                     commands={},
                     groups={}
                 )
@@ -60,7 +61,17 @@ class Config:
                         continue
                     disabled = (cmd_el.get('disabled') or '').lower() == 'true'
                     payload = (cmd_el.text or '').strip()
-                    device.commands[cmd_name] = Command(cmd_name, payload, disabled)
+                    # Positional attributes for fancy view
+                    def to_int(val: Optional[str]) -> Optional[int]:
+                        try:
+                            return int(val) if val is not None and val != '' else None
+                        except ValueError:
+                            return None
+                    x = to_int(cmd_el.get('x'))
+                    y = to_int(cmd_el.get('y'))
+                    width = to_int(cmd_el.get('width'))
+                    height = to_int(cmd_el.get('height'))
+                    device.commands[cmd_name] = Command(cmd_name, payload, disabled, x, y, width, height)
                 # Groups (may be nested)
                 for g_el in d_el.findall('group'):
                     grp = self._parse_group(g_el)
@@ -79,7 +90,17 @@ class Config:
                 continue
             disabled = (cmd_el.get('disabled') or '').lower() == 'true'
             payload = (cmd_el.text or '').strip()
-            group.commands[cmd_name] = Command(cmd_name, payload, disabled)
+            # Positional attributes for fancy view
+            def to_int(val: Optional[str]) -> Optional[int]:
+                try:
+                    return int(val) if val is not None and val != '' else None
+                except ValueError:
+                    return None
+            x = to_int(cmd_el.get('x'))
+            y = to_int(cmd_el.get('y'))
+            width = to_int(cmd_el.get('width'))
+            height = to_int(cmd_el.get('height'))
+            group.commands[cmd_name] = Command(cmd_name, payload, disabled, x, y, width, height)
         for sg_el in g_el.findall('group'):
             subgroup = self._parse_group(sg_el)
             group.subgroups[subgroup.name] = subgroup
@@ -97,12 +118,22 @@ class Config:
         return ctrl.devices.get(d_name)
 
     def list_commands(self, device: Device) -> Dict[str, Any]:
+        def cmd_to_dict(n: str, cmd: Command) -> Dict[str, Any]:
+            data: Dict[str, Any] = {
+                'name': n,
+                'disabled': cmd.disabled,
+            }
+            # Include positional attributes if present
+            if cmd.x is not None and cmd.y is not None and cmd.width is not None and cmd.height is not None:
+                data.update({'x': cmd.x, 'y': cmd.y, 'width': cmd.width, 'height': cmd.height})
+            return data
+
         def group_to_dict(g: Group) -> Dict[str, Any]:
             return {
                 'name': g.name,
                 'disabled': g.disabled,
                 'commands': [
-                    {'name': n, 'disabled': cmd.disabled}
+                    cmd_to_dict(n, cmd)
                     for n, cmd in sorted(g.commands.items())
                 ],
                 'groups': [group_to_dict(sg) for _, sg in sorted(g.subgroups.items())]
@@ -111,8 +142,9 @@ class Config:
         return {
             'device': device.name,
             'friendly_name': device.friendly_name,
+            'image': device.image_src,
             'commands': [
-                {'name': n, 'disabled': cmd.disabled}
+                cmd_to_dict(n, cmd)
                 for n, cmd in sorted(device.commands.items())
             ],
             'groups': [group_to_dict(g) for _, g in sorted(device.groups.items())]

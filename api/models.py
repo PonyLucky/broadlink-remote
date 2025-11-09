@@ -7,6 +7,11 @@ class Command:
     name: str
     payload_hex: str
     disabled: bool = False
+    # Fancy view positional attributes (optional)
+    x: Optional[int] = None
+    y: Optional[int] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
 
 
 @dataclass
@@ -24,6 +29,7 @@ class Device:
     type: str
     manufacturer: Optional[str]
     model: Optional[str]
+    image_src: Optional[str] = None
     commands: Dict[str, Command] = field(default_factory=dict)
     groups: Dict[str, Group] = field(default_factory=dict)
 
