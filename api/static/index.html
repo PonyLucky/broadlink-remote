@@ -9,14 +9,10 @@
 <body>
   <header>
     <h1>Broadlink Controller</h1>
-    <a href="/api/doc/openapi.json" target="_blank">OpenAPI Docs ↗</a>
+    <div><select id="controller"></select></div>
   </header>
   <main>
     <section class="panel">
-      <div class="row">
-        <label for="controller">Controller</label>
-        <select id="controller"></select>
-      </div>
       <div class="row">
         <label for="device">Device</label>
         <select id="device"></select>
@@ -25,7 +21,6 @@
         <button id="refresh" class="primary">🔄 Refresh</button>
       </div>
       <div class="status" id="status"></div>
-      <div class="tip">💡 Tip: Expand groups to view commands. Click <b>Send</b> to execute.</div>
     </section>
 
     <section class="panel" id="commandsPanel">
