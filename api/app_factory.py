@@ -12,7 +12,10 @@ def create_app() -> Flask:
     app = Flask(__name__, static_folder='static', static_url_path='/static')
 
     cfg = Config(XML_PATH)
-    api_bp = create_api_blueprint(cfg)
+    api_bp = create_api_blueprint(cfg, '/api')
+    cfg.reload_if_changed(
+        force=os.getenv('FLASK_ENV') == 'development'
+    )
     app.register_blueprint(api_bp)
 
     @app.get('/')

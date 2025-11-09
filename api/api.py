@@ -6,8 +6,8 @@ from xml_loader import Config
 from bl_client import mac_str_to_bytes, send_via_broadlink, is_broadlink_available
 
 
-def create_api_blueprint(cfg: Config) -> Blueprint:
-    api = Blueprint('api', __name__)
+def create_api_blueprint(cfg: Config, prefix: str) -> Blueprint:
+    api = Blueprint('api', __name__, url_prefix=prefix)
 
     @api.get('/doc/openapi.json')
     def openapi_doc():
