@@ -24,8 +24,74 @@ const filtersApply = $('#filtersApply');
 const API_PATH = '/api';
 const API_PORT = 5000;
 
+// LocalStorage keys and helpers
+const LS_KEYS = {
+  view: 'blr.viewMode',
+  showDisabled: 'blr.showDisabled',
+  controller: 'blr.controller',
+  devicesByController: 'blr.devicesByController',
+};
+function lsGet(key, def = null) {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? def : v;
+  } catch (_) {
+    return def;
+  }
+}
+function lsSet(key, val) {
+  try {
+    localStorage.setItem(key, val);
+  } catch (_) {}
+}
+function lsGetJSON(key, def = {}) {
+  const raw = lsGet(key, null);
+  if (raw == null) return def;
+  try { return JSON.parse(raw); } catch (_) { return def; }
+}
+function lsSetJSON(key, obj) {
+  try { localStorage.setItem(key, JSON.stringify(obj)); } catch (_) {}
+}
+
 let allDevices = [];
 let selectedDevices = new Set();
+
+function currentControllerName() {
+  return decodeURIComponent(controllerSel?.value || '');
+}
+
+function persistDevicesSelectionForCurrentController() {
+  const c = currentControllerName();
+  if (!c) return;
+  const map = lsGetJSON(LS_KEYS.devicesByController, {});
+  map[c] = Array.from(selectedDevices);
+  lsSetJSON(LS_KEYS.devicesByController, map);
+}
+
+function restoreDevicesSelectionForCurrentController() {
+  const c = currentControllerName();
+  if (!c) return;
+  const map = lsGetJSON(LS_KEYS.devicesByController, {});
+  const saved = Array.isArray(map[c]) ? map[c] : null;
+  const names = new Set(allDevices.map(d => d.name));
+  if (saved && saved.length) {
+    const intersect = saved.filter(n => names.has(n));
+    if (intersect.length) {
+      selectedDevices = new Set(intersect);
+      // reflect in UI checkboxes
+      devicesList.querySelectorAll('input[type="checkbox"][data-device]').forEach(cb => {
+        const name = cb.getAttribute('data-device');
+        cb.checked = selectedDevices.has(name);
+      });
+      // update select-all states
+      const total = allDevices.length;
+      const selectedCount = selectedDevices.size;
+      devicesSelectAll.indeterminate = selectedCount > 0 && selectedCount < total;
+      devicesSelectAll.checked = selectedCount === total;
+      updateDevicesTriggerLabel();
+    }
+  }
+}
 
 function updateDevicesTriggerLabel() {
   const total = allDevices.length;
@@ -81,9 +147,11 @@ function setDevicesInDropdown(devices) {
     label.appendChild(span);
     devicesList.appendChild(label);
   }
-  // set select all states
+  // set select all states (default all)
   devicesSelectAll.checked = true;
   devicesSelectAll.indeterminate = false;
+  // Try restore saved selection for this controller
+  restoreDevicesSelectionForCurrentController();
   updateDevicesTriggerLabel();
   bindDeviceItemHandlers();
   if (devicesTrigger) devicesTrigger.disabled = false;
@@ -149,6 +217,15 @@ async function loadControllers() {
       return;
     }
     controllerSel.innerHTML = controllers.map(c => `<option value="${encodeURIComponent(c.name)}">${c.friendly_name || c.name} (${c.name})</option>`).join('');
+    // Restore previously selected controller if available
+    const savedCtrl = lsGet(LS_KEYS.controller, null);
+    if (savedCtrl) {
+      const enc = encodeURIComponent(savedCtrl);
+      const opt = Array.from(controllerSel.options).find(o => o.value === enc);
+      if (opt) controllerSel.value = enc;
+    }
+    // Persist current selection
+    lsSet(LS_KEYS.controller, decodeURIComponent(controllerSel.value || ''));
     await loadDevices();
     setStatus('Controllers loaded.', 'ok');
   } catch (e) {
@@ -307,8 +384,17 @@ async function sendCommand(cName, dName, cmdPath) {
   }
 }
 
-controllerSel.addEventListener('change', loadDevices);
-showDisabledChk.addEventListener('change', applyDisabledFilter);
+controllerSel.addEventListener('change', () => {
+  // persist controller selection
+  lsSet(LS_KEYS.controller, decodeURIComponent(controllerSel.value || ''));
+  loadDevices();
+  if (isFancyActive()) updateFancyView();
+});
+showDisabledChk.addEventListener('change', () => {
+  lsSet(LS_KEYS.showDisabled, showDisabledChk.checked ? '1' : '0');
+  applyDisabledFilter();
+  if (isFancyActive()) updateFancyView();
+});
 
 // Dropdown interactions
 function openDevicesMenu() {
@@ -341,6 +427,7 @@ devicesSelectAll?.addEventListener('change', () => {
     cb.checked = check;
   });
   updateDevicesTriggerLabel();
+  persistDevicesSelectionForCurrentController();
   loadSelectedDevicesCommands();
   afterDevicesSelectionChanged();
 });
@@ -357,6 +444,7 @@ function bindDeviceItemHandlers() {
       devicesSelectAll.indeterminate = selectedCount > 0 && selectedCount < total;
       devicesSelectAll.checked = selectedCount === total;
       updateDevicesTriggerLabel();
+      persistDevicesSelectionForCurrentController();
       loadSelectedDevicesCommands();
       afterDevicesSelectionChanged();
     });
@@ -431,6 +519,8 @@ document.addEventListener('keydown', (e) => {
 // View switching logic
 function setActiveView(mode) {
   const toFancy = mode === 'fancy';
+  // persist mode
+  lsSet(LS_KEYS.view, toFancy ? 'fancy' : 'list');
   if (viewFancyBtn && viewListBtn) {
     viewFancyBtn.classList.toggle('active', toFancy);
     viewFancyBtn.setAttribute('aria-pressed', toFancy ? 'true' : 'false');
@@ -601,5 +691,19 @@ function afterDevicesSelectionChanged() {
   if (isFancyActive()) updateFancyView();
 }
 
-// Initial load
-loadControllers();
+// Initialize UI state from localStorage, then initial load
+(async function initFromLocalStorage() {
+  // showDisabled
+  const sd = lsGet(LS_KEYS.showDisabled, '0');
+  if (showDisabledChk) showDisabledChk.checked = sd === '1';
+  // view mode
+  const mode = lsGet(LS_KEYS.view, 'list');
+  // Initial load
+  await loadControllers();
+  // Set view mode after controllers/devices are loaded
+  if (mode === 'fancy') {
+    setActiveView('fancy');
+  } else {
+    setActiveView('list');
+  }
+})();
