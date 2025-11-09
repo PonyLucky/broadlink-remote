@@ -9,30 +9,19 @@
 <body>
   <header>
     <h1>Broadlink Controller</h1>
-    <div><select id="controller"></select></div>
+    <div class="filters">
+      <select id="controller"></select>
+      <div class="multi-dropdown" id="devicesDropdown">
+        <button type="button" id="devicesTrigger" class="dropdown-trigger">All devices</button>
+        <div class="dropdown-menu" id="devicesMenu" hidden>
+          <div class="menu-header"><label class="checkbox"><input type="checkbox" id="devicesSelectAll" checked /> Select all</label></div>
+          <div class="menu-list" id="devicesList"></div>
+        </div>
+      </div>
+      <label class="checkbox"><input type="checkbox" id="showDisabled" /> Show disabled</label>
+    </div>
   </header>
   <main>
-    <section class="panel" id="filters">
-      <div class="toolbar">
-        <div class="field">
-          <label for="devicesTrigger">Devices</label>
-          <div class="multi-dropdown" id="devicesDropdown">
-            <button type="button" id="devicesTrigger" class="dropdown-trigger">All devices</button>
-            <div class="dropdown-menu" id="devicesMenu" hidden>
-              <div class="menu-header"><label class="checkbox"><input type="checkbox" id="devicesSelectAll" checked /> Select all</label></div>
-              <div class="menu-list" id="devicesList"></div>
-            </div>
-          </div>
-        </div>
-        <div class="field inline">
-          <label class="checkbox"><input type="checkbox" id="showDisabled" /> Show disabled</label>
-        </div>
-        <div class="spacer"></div>
-        <button id="refresh" class="primary">Refresh</button>
-      </div>
-      <div class="status" id="status"></div>
-    </section>
-
     <section class="panel" id="commandsPanel">
         <div id="commands"></div>
     </section>

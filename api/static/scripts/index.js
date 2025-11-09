@@ -4,7 +4,6 @@ const devicesTrigger = $('#devicesTrigger');
 const devicesMenu = $('#devicesMenu');
 const devicesList = $('#devicesList');
 const devicesSelectAll = $('#devicesSelectAll');
-const statusEl = $('#status');
 const commandsEl = $('#commands');
 const showDisabledChk = $('#showDisabled');
 const API_PATH = '/api';
@@ -80,8 +79,23 @@ function getSelectedDevices() {
 }
 
 function setStatus(msg, cls = 'muted') {
-  statusEl.className = 'status ' + cls;
-  statusEl.textContent = msg || '';
+  switch (cls) {
+    case 'muted':
+      console.log(msg);
+      break;
+    case 'ok':
+      console.log(`OK: ${msg}`);
+      break;
+    case 'warn':
+      console.warn(`WARN: ${msg}`);
+      break;
+    case 'err':
+      console.error(`ERROR: ${msg}`);
+      break;
+    default:
+      console.log(msg);
+      break;
+  }
 }
 
 function getAPIUrl(path) {
@@ -95,7 +109,7 @@ function getAPIUrl(path) {
 async function fetchJSON(path, options) {
   const res = await fetch(getAPIUrl(path), options);
   if (!res.ok) {
-    let detail = '';
+    let detail;
     try {
       const err = await res.json();
       detail = err.description || err.message || JSON.stringify(err);
@@ -279,7 +293,6 @@ async function sendCommand(cName, dName, cmdPath) {
 }
 
 controllerSel.addEventListener('change', loadDevices);
-$('#refresh').addEventListener('click', loadControllers);
 showDisabledChk.addEventListener('change', applyDisabledFilter);
 
 // Dropdown interactions

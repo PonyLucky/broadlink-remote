@@ -250,7 +250,7 @@ summary:hover { color: var(--accent); }
 .dropdown-menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  right: 0;
   min-width: 260px;
   width: max(260px, 100%);
   background: #0b1220;
