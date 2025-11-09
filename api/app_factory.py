@@ -22,4 +22,8 @@ def create_app() -> Flask:
     def index():
         return send_from_directory(app.static_folder, 'index.html')
 
+    @app.get('/static/<path:path>')
+    def static_file(path):
+        return send_from_directory(app.static_folder, path)
+
     return app
