@@ -63,6 +63,9 @@ header {
   color: var(--text);
   border-radius: 6px;
 }
+.segmented .seg-btn:focus {
+  outline: none !important;
+}
 .segmented .sep { color: #475569; }
 
 /* Filters button in header */
