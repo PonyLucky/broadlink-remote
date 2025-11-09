@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Broadlink Controller UI</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --muted: #9ca3af;
+      --text: #e5e7eb;
+      --accent: #60a5fa;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --err: #f87171;
+      --disabled: #6b7280;
+    }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    header { padding: 16px; background: #0b1220; border-bottom: 1px solid #1f2937; display: flex; align-items: center; gap: 16px; }
+    header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    header a { color: var(--muted); text-decoration: none; font-size: 12px; }
+    main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px; box-sizing: border-box; height: calc(100% - 58px); }
+    .panel { background: var(--panel); border: 1px solid #1f2937; border-radius: 8px; padding: 12px; }
+    .row { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 12px; }
+    label { font-size: 12px; color: var(--muted); }
+    select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #334155; background: #0b1220; color: var(--text); }
+    button { background: #1f2937; color: var(--text); border: 1px solid #334155; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+    button:hover { background: #243041; }
+    button.primary { background: #1d4ed8; border-color: #2563eb; }
+    button.primary:hover { background: #1e40af; }
+    button[disabled] { opacity: 0.6; cursor: not-allowed; }
+    .muted { color: var(--muted); }
+    .ok { color: var(--ok); }
+    .err { color: var(--err); }
+    .warn { color: var(--warn); }
+    .status { min-height: 20px; font-size: 12px; }
+
+    /* Commands tree */
+    .tree { list-style: none; margin: 0; padding: 0; }
+    .tree li { margin: 0; padding: 4px 0 4px 10px; border-left: 1px dotted #374151; position: relative; }
+    .tree li::before { content: ''; position: absolute; left: -1px; top: 12px; width: 8px; height: 1px; background: #374151; }
+    details { margin: 4px 0; }
+    summary { cursor: pointer; user-select: none; }
+    .cmd { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+    .cmd .name { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+    .badge { font-size: 10px; padding: 2px 6px; border-radius: 999px; border: 1px solid #374151; color: var(--muted); }
+    .badge.disabled { color: var(--disabled); border-color: #4b5563; }
+    .small { font-size: 12px; }
+    .flex { display: flex; align-items: center; gap: 8px; }
+    .space { flex: 1; }
+    .hr { border-top: 1px solid #1f2937; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Broadlink Controller</h1>
+    <a href="/doc/openapi.json" target="_blank" rel="noreferrer">OpenAPI</a>
+  </header>
+  <main>
+    <section class="panel">
+      <div class="row">
+        <label for="controller">Controller</label>
+        <select id="controller"></select>
+      </div>
+      <div class="row">
+        <label for="device">Device</label>
+        <select id="device"></select>
+      </div>
+      <div class="row">
+        <button id="refresh" class="primary">Refresh</button>
+      </div>
+      <div class="row">
+        <div class="status" id="status"></div>
+      </div>
+      <div class="hr"></div>
+      <div class="small muted">
+        Tip: Click group headers to expand/collapse. Use buttons to send commands.
+      </div>
+    </section>
+
+    <section class="panel" id="commandsPanel">
+      <h3 class="small muted" id="deviceTitle">Select a controller and device.</h3>
+      <ul class="tree" id="commands"></ul>
+    </section>
+  </main>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const controllerSel = $('#controller');
+    const deviceSel = $('#device');
+    const statusEl = $('#status');
+    const commandsEl = $('#commands');
+    const deviceTitle = $('#deviceTitle');
+
+    function setStatus(msg, cls = 'muted') {
+      statusEl.className = 'status ' + cls;
+      statusEl.textContent = msg || '';
+    }
+
+    async function fetchJSON(url, options) {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        let detail = '';
+        try {
+          const err = await res.json();
+          detail = err.description || err.message || JSON.stringify(err);
+        } catch (_) {
+          detail = await res.text();
+        }
+        throw new Error(`${res.status} ${res.statusText}${detail ? ' — ' + detail : ''}`);
+      }
+      return res.json();
+    }
+
+    async function loadControllers() {
+      setStatus('Loading controllers...', 'muted');
+      controllerSel.innerHTML = '';
+      deviceSel.innerHTML = '';
+      commandsEl.innerHTML = '';
+      deviceTitle.textContent = 'Select a controller and device.';
+      try {
+        const controllers = await fetchJSON('/controller');
+        if (!controllers.length) {
+          controllerSel.innerHTML = '<option value="">(none)</option>';
+          setStatus('No controllers found in XML.', 'warn');
+          return;
+        }
+        controllerSel.innerHTML = controllers.map(c => `<option value="${encodeURIComponent(c.name)}">${c.friendly_name || c.name} (${c.name})</option>`).join('');
+        await loadDevices();
+        setStatus('Controllers loaded.', 'ok');
+      } catch (e) {
+        setStatus(e.message, 'err');
+      }
+    }
+
+    async function loadDevices() {
+      const c = decodeURIComponent(controllerSel.value || '');
+      deviceSel.innerHTML = '';
+      commandsEl.innerHTML = '';
+      deviceTitle.textContent = 'Select a controller and device.';
+      if (!c) return;
+      setStatus(`Loading devices for ${c}...`, 'muted');
+      try {
+        const devices = await fetchJSON(`/${encodeURIComponent(c)}/device`);
+        if (!devices.length) {
+          deviceSel.innerHTML = '<option value="">(none)</option>';
+          setStatus('No devices found for controller.', 'warn');
+          return;
+        }
+        deviceSel.innerHTML = devices.map(d => `<option value="${encodeURIComponent(d.name)}">${d.friendly_name || d.name} (${d.name})</option>`).join('');
+        await loadCommands();
+        setStatus('Devices loaded.', 'ok');
+      } catch (e) {
+        setStatus(e.message, 'err');
+      }
+    }
+
+    function renderCommandsTree(data, cName, dName) {
+      commandsEl.innerHTML = '';
+      deviceTitle.textContent = `${data.friendly_name || data.device} — Commands`;
+
+      const ul = document.createElement('ul');
+      ul.className = 'tree';
+
+      // Top-level commands
+      for (const cmd of data.commands || []) {
+        ul.appendChild(renderCommandItem(cName, dName, [], cmd));
+      }
+
+      // Groups
+      for (const g of data.groups || []) {
+        ul.appendChild(renderGroupItem(cName, dName, [], g));
+      }
+
+      commandsEl.appendChild(ul);
+    }
+
+    function renderCommandItem(cName, dName, groupPath, cmd) {
+      const li = document.createElement('li');
+      const wrap = document.createElement('div');
+      wrap.className = 'cmd';
+
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = [...groupPath, cmd.name].join('.')
+
+      const badge = document.createElement('span');
+      badge.className = 'badge' + (cmd.disabled ? ' disabled' : '');
+      badge.textContent = cmd.disabled ? 'disabled' : 'command';
+
+      const space = document.createElement('div');
+      space.className = 'space';
+
+      const btn = document.createElement('button');
+      btn.textContent = 'Send';
+      btn.disabled = !!cmd.disabled;
+      btn.onclick = () => sendCommand(cName, dName, [...groupPath, cmd.name].join('.'));
+
+      wrap.appendChild(name);
+      wrap.appendChild(badge);
+      wrap.appendChild(space);
+      wrap.appendChild(btn);
+      li.appendChild(wrap);
+      return li;
+    }
+
+    function renderGroupItem(cName, dName, parentPath, group) {
+      const li = document.createElement('li');
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      const title = document.createElement('span');
+      title.textContent = group.name;
+
+      const badge = document.createElement('span');
+      badge.className = 'badge' + (group.disabled ? ' disabled' : '');
+      badge.textContent = group.disabled ? 'group disabled' : 'group';
+
+      summary.appendChild(title);
+      summary.appendChild(document.createTextNode(' '));
+      summary.appendChild(badge);
+      details.appendChild(summary);
+
+      const path = [...parentPath, group.name];
+
+      const inner = document.createElement('ul');
+      inner.className = 'tree';
+
+      // Commands inside the group
+      for (const cmd of group.commands || []) {
+        inner.appendChild(renderCommandItem(cName, dName, path, cmd));
+      }
+      // Sub-groups
+      for (const sg of group.groups || []) {
+        inner.appendChild(renderGroupItem(cName, dName, path, sg));
+      }
+
+      details.appendChild(inner);
+      li.appendChild(details);
+      return li;
+    }
+
+    async function loadCommands() {
+      const c = decodeURIComponent(controllerSel.value || '');
+      const d = decodeURIComponent(deviceSel.value || '');
+      commandsEl.innerHTML = '';
+      if (!c || !d) return;
+      setStatus(`Loading commands for ${c}/${d}...`, 'muted');
+      try {
+        const data = await fetchJSON(`/${encodeURIComponent(c)}/${encodeURIComponent(d)}`);
+        renderCommandsTree(data, c, d);
+        setStatus('Commands loaded.', 'ok');
+      } catch (e) {
+        setStatus(e.message, 'err');
+      }
+    }
+
+    async function sendCommand(cName, dName, cmdPath) {
+      const url = `/${encodeURIComponent(cName)}/${encodeURIComponent(dName)}/${encodeURIComponent(cmdPath)}`;
+      setStatus(`Sending: ${cName}/${dName}/${cmdPath} ...`, 'muted');
+      try {
+        const res = await fetchJSON(url, { method: 'POST' });
+        setStatus(`OK: ${res.status || 'ok'} — ${res.controller}/${res.device}/${res.command}`, 'ok');
+      } catch (e) {
+        setStatus(e.message, 'err');
+      }
+    }
+
+    controllerSel.addEventListener('change', loadDevices);
+    deviceSel.addEventListener('change', loadCommands);
+    $('#refresh').addEventListener('click', loadControllers);
+
+    // Initial load
+    loadControllers();
+  </script>
+</body>
+</html>
