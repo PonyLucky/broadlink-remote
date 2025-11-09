@@ -7,6 +7,13 @@ const devicesSelectAll = $('#devicesSelectAll');
 const commandsEl = $('#commands');
 const showDisabledChk = $('#showDisabled');
 
+// View toggle elements
+const viewFancyBtn = $('#viewFancyBtn');
+const viewListBtn = $('#viewListBtn');
+const commandsPanel = $('#commandsPanel');
+const commandsView = $('#commandsView');
+const controllerSvg = $('#controllerSvg');
+
 // Modal elements
 const filtersBtn = $('#filtersBtn');
 const filtersOverlay = $('#filtersOverlay');
@@ -335,6 +342,7 @@ devicesSelectAll?.addEventListener('change', () => {
   });
   updateDevicesTriggerLabel();
   loadSelectedDevicesCommands();
+  afterDevicesSelectionChanged();
 });
 
 // helper to bind item change
@@ -350,6 +358,7 @@ function bindDeviceItemHandlers() {
       devicesSelectAll.checked = selectedCount === total;
       updateDevicesTriggerLabel();
       loadSelectedDevicesCommands();
+      afterDevicesSelectionChanged();
     });
   });
 }
@@ -418,6 +427,74 @@ document.addEventListener('keydown', (e) => {
     }
   }
 });
+
+// View switching logic
+function setActiveView(mode) {
+  const toFancy = mode === 'fancy';
+  if (viewFancyBtn && viewListBtn) {
+    viewFancyBtn.classList.toggle('active', toFancy);
+    viewFancyBtn.setAttribute('aria-pressed', toFancy ? 'true' : 'false');
+    viewListBtn.classList.toggle('active', !toFancy);
+    viewListBtn.setAttribute('aria-pressed', !toFancy ? 'true' : 'false');
+  }
+  if (commandsPanel && commandsView) {
+    commandsPanel.hidden = toFancy;
+    commandsView.hidden = !toFancy;
+  }
+  if (toFancy) updateFancyView();
+}
+
+function isFancyActive() {
+  return !!(viewFancyBtn && viewFancyBtn.classList.contains('active'));
+}
+
+function clearSvg(svg) {
+  if (!svg) return;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+}
+
+function updateFancyView() {
+  if (!commandsView) return;
+  const controller = decodeURIComponent(controllerSel?.value || '');
+  const devices = getSelectedDevices();
+  // Prepare empty placeholder SVG for now
+  if (controllerSvg) {
+    clearSvg(controllerSvg);
+    controllerSvg.setAttribute('viewBox', '0 0 100 100');
+    // If an external view renderer is provided later, use it
+    if (window.ControllerView && typeof window.ControllerView.render === 'function') {
+      try {
+        window.ControllerView.render({ controller, devices, svg: controllerSvg });
+      } catch (e) {
+        console.error('ControllerView.render error:', e);
+      }
+    } else {
+      const ns = 'http://www.w3.org/2000/svg';
+      const text = document.createElementNS(ns, 'text');
+      text.setAttribute('x', '50');
+      text.setAttribute('y', '50');
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('fill', '#94a3b8');
+      text.setAttribute('font-size', '6');
+      text.textContent = controller ? `Fancy view for ${controller}` : 'Fancy view';
+      controllerSvg.appendChild(text);
+    }
+  }
+}
+
+// Bind view buttons
+viewFancyBtn?.addEventListener('click', () => setActiveView('fancy'));
+viewListBtn?.addEventListener('click', () => setActiveView('list'));
+
+// Keep fancy view in sync with selection changes
+controllerSel.addEventListener('change', () => { if (isFancyActive()) updateFancyView(); });
+showDisabledChk.addEventListener('change', () => { if (isFancyActive()) updateFancyView(); });
+
+// When devices selection changes, load list and refresh fancy view
+function afterDevicesSelectionChanged() {
+  if (isFancyActive()) updateFancyView();
+}
 
 // Initial load
 loadControllers();

@@ -34,6 +34,37 @@ header {
   z-index: 10;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* View segmented control */
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0b1220;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 4px 8px;
+}
+.segmented .seg-btn {
+  border: none;
+  background: transparent;
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.segmented .seg-btn:hover { color: var(--text); }
+.segmented .seg-btn.active {
+  background: #1e293b;
+  color: var(--text);
+  border-radius: 6px;
+}
+.segmented .sep { color: #475569; }
+
 /* Filters button in header */
 .filters-btn {
   border-radius: 8px;
@@ -77,6 +108,7 @@ main {
   flex-direction: column;
   overflow: hidden;
 }
+.panel[hidden] { display: none; }
 
 .row { margin-bottom: 14px; }
 
