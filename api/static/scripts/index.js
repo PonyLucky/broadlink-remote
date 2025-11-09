@@ -6,6 +6,14 @@ const devicesList = $('#devicesList');
 const devicesSelectAll = $('#devicesSelectAll');
 const commandsEl = $('#commands');
 const showDisabledChk = $('#showDisabled');
+
+// Modal elements
+const filtersBtn = $('#filtersBtn');
+const filtersOverlay = $('#filtersOverlay');
+const filtersModal = $('#filtersModal');
+const filtersClose = $('#filtersClose');
+const filtersApply = $('#filtersApply');
+
 const API_PATH = '/api';
 const API_PORT = 5000;
 
@@ -345,6 +353,71 @@ function bindDeviceItemHandlers() {
     });
   });
 }
+
+// Modal open/close helpers
+let lastFocusedEl = null;
+function isModalOpen() {
+  return !filtersModal?.hasAttribute('hidden');
+}
+function openFiltersModal() {
+  if (!filtersModal || !filtersOverlay) return;
+  lastFocusedEl = document.activeElement;
+  filtersOverlay.hidden = false;
+  filtersModal.hidden = false;
+  document.body.classList.add('modal-open');
+  // focus first focusable element inside modal
+  const focusable = filtersModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (focusable.length) {
+    /** @type {HTMLElement} */(focusable[0]).focus();
+  } else {
+    filtersClose?.focus();
+  }
+}
+function closeFiltersModal() {
+  if (!filtersModal || !filtersOverlay) return;
+  filtersOverlay.hidden = true;
+  filtersModal.hidden = true;
+  document.body.classList.remove('modal-open');
+  if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') {
+    lastFocusedEl.focus();
+  } else {
+    filtersBtn?.focus();
+  }
+}
+
+// Bind modal events
+filtersBtn?.addEventListener('click', openFiltersModal);
+filtersClose?.addEventListener('click', closeFiltersModal);
+filtersApply?.addEventListener('click', closeFiltersModal);
+filtersOverlay?.addEventListener('click', closeFiltersModal);
+
+// Close on Escape and trap focus inside modal when open
+document.addEventListener('keydown', (e) => {
+  if (!isModalOpen()) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeFiltersModal();
+    return;
+  }
+  if (e.key === 'Tab') {
+    const focusable = Array.from(filtersModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const current = document.activeElement;
+    if (e.shiftKey) {
+      if (current === first || !filtersModal.contains(current)) {
+        e.preventDefault();
+        /** @type {HTMLElement} */(last).focus();
+      }
+    } else {
+      if (current === last) {
+        e.preventDefault();
+        /** @type {HTMLElement} */(first).focus();
+      }
+    }
+  }
+});
 
 // Initial load
 loadControllers();

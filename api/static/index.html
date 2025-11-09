@@ -9,23 +9,45 @@
 <body>
   <header>
     <h1>Broadlink Controller</h1>
-    <div class="filters">
-      <select id="controller"></select>
-      <div class="multi-dropdown" id="devicesDropdown">
-        <button type="button" id="devicesTrigger" class="dropdown-trigger">All devices</button>
-        <div class="dropdown-menu" id="devicesMenu" hidden>
-          <div class="menu-header"><label class="checkbox"><input type="checkbox" id="devicesSelectAll" checked /> Select all</label></div>
-          <div class="menu-list" id="devicesList"></div>
-        </div>
-      </div>
-      <label class="checkbox"><input type="checkbox" id="showDisabled" /> Show disabled</label>
-    </div>
+    <button type="button" id="filtersBtn" class="filters-btn">Filters</button>
   </header>
   <main>
     <section class="panel" id="commandsPanel">
         <div id="commands"></div>
     </section>
   </main>
+
+  <!-- Filters Modal -->
+  <div id="filtersOverlay" class="modal-overlay" hidden></div>
+  <div id="filtersModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="filtersTitle" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="filtersTitle">Filters</h2>
+        <button type="button" id="filtersClose" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label for="controller">Controller</label>
+          <select id="controller"></select>
+        </div>
+        <div class="field">
+          <label>Devices</label>
+          <div class="multi-dropdown" id="devicesDropdown">
+            <button type="button" id="devicesTrigger" class="dropdown-trigger">All devices</button>
+            <div class="dropdown-menu" id="devicesMenu" hidden>
+              <div class="menu-header"><label class="checkbox"><input type="checkbox" id="devicesSelectAll" checked /> Select all</label></div>
+              <div class="menu-list" id="devicesList"></div>
+            </div>
+          </div>
+        </div>
+        <label class="checkbox"><input type="checkbox" id="showDisabled" /> Show disabled</label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="filtersApply" class="primary">Apply</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/scripts/index.js"></script>
 </body>
 </html>

@@ -34,6 +34,18 @@ header {
   z-index: 10;
 }
 
+/* Filters button in header */
+.filters-btn {
+  border-radius: 8px;
+  padding: 8px 12px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+.filters-btn:hover { background: #334155; }
+
 header h1 {
   font-size: 20px;
   font-weight: 600;
@@ -76,7 +88,6 @@ label {
 }
 
 select, button {
-  width: 100%;
   border-radius: 8px;
   padding: 8px 10px;
   border: 1px solid #334155;
@@ -236,7 +247,6 @@ summary:hover { color: var(--accent); }
 /* Custom multi-select dropdown */
 .multi-dropdown { position: relative; }
 .dropdown-trigger {
-  width: 100%;
   border-radius: 8px;
   padding: 8px 10px;
   border: 1px solid #334155;
@@ -245,6 +255,7 @@ summary:hover { color: var(--accent); }
   font-size: 14px;
   text-align: left;
   cursor: pointer;
+  min-width: 170px;
 }
 .dropdown-trigger[disabled] { opacity: 0.6; cursor: not-allowed; }
 .dropdown-menu {
@@ -298,3 +309,75 @@ summary:hover { color: var(--accent); }
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* Modal styles */
+body.modal-open { overflow: hidden; }
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(1px);
+  z-index: 40;
+}
+.modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+.modal[hidden] { display: none; }
+.modal .modal-body-wrapper {
+  max-height: 80vh;
+}
+.modal > * {
+  box-sizing: border-box;
+}
+.modal .panel-like {
+  background: var(--panel);
+  color: var(--text);
+}
+.modal .modal-content {
+  width: min(320px, calc(100vw - 32px));
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  border: 1px solid #334155;
+  padding: 12px 12px 12px 12px;
+}
+.modal .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px;
+  border-bottom: 1px solid #1f2937;
+}
+.modal .modal-header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+.icon-btn {
+  background: transparent;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: var(--text);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.icon-btn:hover { background: #111827; }
+.modal .modal-body {
+  padding: 10px 6px;
+  display: grid;
+  gap: 12px;
+}
+.modal .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 6px;
+  border-top: 1px solid #1f2937;
+}
+
+/* Ensure dropdown menu shows above modal content */
+.modal .dropdown-menu { z-index: 60; }
