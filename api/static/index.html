@@ -12,25 +12,29 @@
     <div><select id="controller"></select></div>
   </header>
   <main>
-    <section class="panel">
-      <div class="row">
-        <label for="device">Device</label>
-        <select id="device"></select>
-      </div>
-      <div class="row">
-        <button id="refresh" class="primary">🔄 Refresh</button>
+    <section class="panel" id="filters">
+      <div class="toolbar">
+        <div class="field">
+          <label for="devicesTrigger">Devices</label>
+          <div class="multi-dropdown" id="devicesDropdown">
+            <button type="button" id="devicesTrigger" class="dropdown-trigger">All devices</button>
+            <div class="dropdown-menu" id="devicesMenu" hidden>
+              <div class="menu-header"><label class="checkbox"><input type="checkbox" id="devicesSelectAll" checked /> Select all</label></div>
+              <div class="menu-list" id="devicesList"></div>
+            </div>
+          </div>
+        </div>
+        <div class="field inline">
+          <label class="checkbox"><input type="checkbox" id="showDisabled" /> Show disabled</label>
+        </div>
+        <div class="spacer"></div>
+        <button id="refresh" class="primary">Refresh</button>
       </div>
       <div class="status" id="status"></div>
     </section>
 
     <section class="panel" id="commandsPanel">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 class="muted" id="deviceTitle">Select a controller and device.</h3>
-            <button id="toggleDisabled" style="width: auto; padding: 4px 8px; font-size: 12px;" class="primary">
-                Show disabled
-            </button>
-        </div>
-        <ul class="tree" id="commands"></ul>
+        <div id="commands"></div>
     </section>
   </main>
   <script src="/static/scripts/index.js"></script>

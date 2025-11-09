@@ -1,13 +1,83 @@
 const $ = (sel) => document.querySelector(sel);
 const controllerSel = $('#controller');
-const deviceSel = $('#device');
+const devicesTrigger = $('#devicesTrigger');
+const devicesMenu = $('#devicesMenu');
+const devicesList = $('#devicesList');
+const devicesSelectAll = $('#devicesSelectAll');
 const statusEl = $('#status');
 const commandsEl = $('#commands');
-const deviceTitle = $('#deviceTitle');
-const toggleDisabledBtn = $('#toggleDisabled');
-let showDisabled = false;
+const showDisabledChk = $('#showDisabled');
 const API_PATH = '/api';
 const API_PORT = 5000;
+
+let allDevices = [];
+let selectedDevices = new Set();
+
+function updateDevicesTriggerLabel() {
+  const total = allDevices.length;
+  const selectedCount = selectedDevices.size;
+  if (total === 0) {
+    devicesTrigger.textContent = 'No devices';
+    devicesTrigger.disabled = true;
+    return;
+  }
+  devicesTrigger.disabled = false;
+  if (selectedCount === 0) {
+    devicesTrigger.textContent = 'No devices';
+  } else if (selectedCount === total) {
+    devicesTrigger.textContent = 'All devices';
+  } else {
+    // show first 2 friendly names and +N
+    const map = new Map(allDevices.map(d => [d.name, (d.friendly_name || d.name) + ' (' + d.name + ')']));
+    const names = Array.from(selectedDevices).slice(0, 2).map(n => map.get(n) || n);
+    const more = selectedCount - names.length;
+    devicesTrigger.textContent = names.join(', ') + (more > 0 ? ` +${more}` : '');
+  }
+}
+
+function resetDevicesDropdown() {
+  allDevices = [];
+  selectedDevices = new Set();
+  if (devicesList) devicesList.innerHTML = '';
+  if (devicesSelectAll) {
+    devicesSelectAll.checked = true;
+    devicesSelectAll.indeterminate = false;
+  }
+  devicesTrigger && (devicesTrigger.textContent = 'All devices');
+  if (devicesTrigger) devicesTrigger.disabled = true;
+  closeDevicesMenu();
+}
+
+function setDevicesInDropdown(devices) {
+  // devices: array with {name, friendly_name}
+  allDevices = devices.map(d => ({ name: d.name, friendly_name: d.friendly_name || d.name }));
+  selectedDevices = new Set(allDevices.map(d => d.name));
+  // build list
+  devicesList.innerHTML = '';
+  for (const d of allDevices) {
+    const label = document.createElement('label');
+    label.className = 'option';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.setAttribute('data-device', d.name);
+    const span = document.createElement('span');
+    span.textContent = `${d.friendly_name} (${d.name})`;
+    label.appendChild(cb);
+    label.appendChild(span);
+    devicesList.appendChild(label);
+  }
+  // set select all states
+  devicesSelectAll.checked = true;
+  devicesSelectAll.indeterminate = false;
+  updateDevicesTriggerLabel();
+  bindDeviceItemHandlers();
+  if (devicesTrigger) devicesTrigger.disabled = false;
+}
+
+function getSelectedDevices() {
+  return Array.from(selectedDevices);
+}
 
 function setStatus(msg, cls = 'muted') {
   statusEl.className = 'status ' + cls;
@@ -40,9 +110,8 @@ async function fetchJSON(path, options) {
 async function loadControllers() {
   setStatus('Loading controllers...', 'muted');
   controllerSel.innerHTML = '';
-  deviceSel.innerHTML = '';
+  resetDevicesDropdown();
   commandsEl.innerHTML = '';
-  deviceTitle.textContent = 'Select a controller and device.';
   try {
     const controllers = await fetchJSON('/controller');
     if (!controllers.length) {
@@ -60,44 +129,42 @@ async function loadControllers() {
 
 async function loadDevices() {
   const c = decodeURIComponent(controllerSel.value || '');
-  deviceSel.innerHTML = '';
+  resetDevicesDropdown();
   commandsEl.innerHTML = '';
-  deviceTitle.textContent = 'Select a controller and device.';
   if (!c) return;
   setStatus(`Loading devices for ${c}...`, 'muted');
   try {
     const devices = await fetchJSON(`/${encodeURIComponent(c)}/device`);
     if (!devices.length) {
-      deviceSel.innerHTML = '<option value="">(none)</option>';
       setStatus('No devices found for controller.', 'warn');
       return;
     }
-    deviceSel.innerHTML = devices.map(d => `<option value="${encodeURIComponent(d.name)}">${d.friendly_name || d.name} (${d.name})</option>`).join('');
-    await loadCommands();
+    setDevicesInDropdown(devices);
+    await loadSelectedDevicesCommands();
     setStatus('Devices loaded.', 'ok');
   } catch (e) {
     setStatus(e.message, 'err');
   }
 }
 
-function renderCommandsTree(data, cName, dName) {
-  commandsEl.innerHTML = '';
-  deviceTitle.textContent = `${data.friendly_name || data.device} — Commands`;
+function renderCommandsTreeInto(container, data, cName, dName) {
+  // Title
+  const title = document.createElement('h3');
+  title.className = 'muted';
+  title.textContent = `${data.friendly_name || data.device || dName}`;
+  container.appendChild(title);
 
   const ul = document.createElement('ul');
   ul.className = 'tree';
 
-  // Top-level commands
   for (const cmd of data.commands || []) {
     ul.appendChild(renderCommandItem(cName, dName, [], cmd));
   }
-
-  // Groups
   for (const g of data.groups || []) {
     ul.appendChild(renderGroupItem(cName, dName, [], g));
   }
 
-  commandsEl.appendChild(ul);
+  container.appendChild(ul);
 }
 
 function renderCommandItem(cName, dName, groupPath, cmd) {
@@ -151,11 +218,9 @@ function renderGroupItem(cName, dName, parentPath, group) {
   const inner = document.createElement('ul');
   inner.className = 'tree';
 
-  // Commands inside the group
   for (const cmd of group.commands || []) {
     inner.appendChild(renderCommandItem(cName, dName, path, cmd));
   }
-  // Sub-groups
   for (const sg of group.groups || []) {
     inner.appendChild(renderGroupItem(cName, dName, path, sg));
   }
@@ -165,27 +230,41 @@ function renderGroupItem(cName, dName, parentPath, group) {
   return li;
 }
 
-async function loadCommands() {
+async function loadSelectedDevicesCommands() {
   const c = decodeURIComponent(controllerSel.value || '');
-  const d = decodeURIComponent(deviceSel.value || '');
   commandsEl.innerHTML = '';
-  if (!c || !d) return;
-  setStatus(`Loading commands for ${c}/${d}...`, 'muted');
+  if (!c) return;
+  const selected = getSelectedDevices();
+  if (!selected.length) {
+    setStatus('No device selected. Select one or more devices.', 'warn');
+    return;
+  }
   try {
-    const data = await fetchJSON(`/${encodeURIComponent(c)}/${encodeURIComponent(d)}`);
-    renderCommandsTree(data, c, d);
-      // Initially hide disabled items
-      const items = commandsEl.querySelectorAll('.cmd, details');
-      items.forEach(item => {
-          const isDisabled = item.querySelector('.badge.disabled');
-          if (isDisabled) {
-              item.closest('li').style.display = showDisabled ? '' : 'none';
-          }
-      });
-      setStatus('Commands loaded.', 'ok');
+    for (const d of selected) {
+      setStatus(`Loading commands for ${c}/${d}...`, 'muted');
+      const data = await fetchJSON(`/${encodeURIComponent(c)}/${encodeURIComponent(d)}`);
+      const section = document.createElement('section');
+      section.className = 'device-commands';
+      renderCommandsTreeInto(section, data, c, d);
+      commandsEl.appendChild(section);
+    }
+    applyDisabledFilter();
+    setStatus('Commands loaded.', 'ok');
   } catch (e) {
     setStatus(e.message, 'err');
   }
+}
+
+function applyDisabledFilter() {
+  const showDisabled = !!showDisabledChk.checked;
+  const items = commandsEl.querySelectorAll('.cmd, details');
+  items.forEach(item => {
+    const isDisabled = item.querySelector('.badge.disabled');
+    if (isDisabled) {
+      const li = item.closest('li');
+      if (li) li.style.display = showDisabled ? '' : 'none';
+    }
+  });
 }
 
 async function sendCommand(cName, dName, cmdPath) {
@@ -200,19 +279,59 @@ async function sendCommand(cName, dName, cmdPath) {
 }
 
 controllerSel.addEventListener('change', loadDevices);
-deviceSel.addEventListener('change', loadCommands);
 $('#refresh').addEventListener('click', loadControllers);
-toggleDisabledBtn.addEventListener('click', () => {
-    showDisabled = !showDisabled;
-    toggleDisabledBtn.textContent = showDisabled ? 'Hide disabled' : 'Show disabled';
-    const items = commandsEl.querySelectorAll('.cmd, details');
-    items.forEach(item => {
-        const isDisabled = item.querySelector('.badge.disabled');
-        if (isDisabled) {
-            item.closest('li').style.display = showDisabled ? '' : 'none';
-        }
-    });
+showDisabledChk.addEventListener('change', applyDisabledFilter);
+
+// Dropdown interactions
+function openDevicesMenu() {
+  devicesMenu.hidden = false;
+  devicesTrigger.setAttribute('aria-expanded', 'true');
+}
+function closeDevicesMenu() {
+  devicesMenu.hidden = true;
+  devicesTrigger.setAttribute('aria-expanded', 'false');
+}
+devicesTrigger?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isOpen = devicesTrigger.getAttribute('aria-expanded') === 'true';
+  if (isOpen) closeDevicesMenu(); else openDevicesMenu();
 });
+document.addEventListener('click', (e) => {
+  if (!devicesMenu.hidden && !devicesMenu.contains(e.target) && e.target !== devicesTrigger) {
+    closeDevicesMenu();
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeDevicesMenu();
+});
+
+devicesSelectAll?.addEventListener('change', () => {
+  const check = devicesSelectAll.checked;
+  selectedDevices = new Set(check ? allDevices.map(d => d.name) : []);
+  // reflect in UI
+  devicesList.querySelectorAll('input[type="checkbox"][data-device]').forEach(cb => {
+    cb.checked = check;
+  });
+  updateDevicesTriggerLabel();
+  loadSelectedDevicesCommands();
+});
+
+// helper to bind item change
+function bindDeviceItemHandlers() {
+  devicesList.querySelectorAll('input[type="checkbox"][data-device]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const name = cb.getAttribute('data-device');
+      if (cb.checked) selectedDevices.add(name); else selectedDevices.delete(name);
+      // update select-all indeterminate state
+      const total = allDevices.length;
+      const selectedCount = selectedDevices.size;
+      devicesSelectAll.indeterminate = selectedCount > 0 && selectedCount < total;
+      devicesSelectAll.checked = selectedCount === total;
+      updateDevicesTriggerLabel();
+      loadSelectedDevicesCommands();
+    });
+  });
+}
 
 // Initial load
 loadControllers();
