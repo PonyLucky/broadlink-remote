@@ -3,59 +3,222 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Broadlink Controller UI</title>
+  <title>Broadlink Controller</title>
   <style>
     :root {
       --bg: #0f172a;
       --panel: #111827;
       --muted: #9ca3af;
-      --text: #e5e7eb;
-      --accent: #60a5fa;
-      --ok: #34d399;
-      --warn: #fbbf24;
-      --err: #f87171;
+      --text: #f1f5f9;
+      --accent: #3b82f6;
+      --ok: #22c55e;
+      --warn: #facc15;
+      --err: #ef4444;
       --disabled: #6b7280;
+      --card-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      --radius: 12px;
     }
-    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
-    header { padding: 16px; background: #0b1220; border-bottom: 1px solid #1f2937; display: flex; align-items: center; gap: 16px; }
-    header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-    header a { color: var(--muted); text-decoration: none; font-size: 12px; }
-    main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px; box-sizing: border-box; height: calc(100% - 58px); }
-    .panel { background: var(--panel); border: 1px solid #1f2937; border-radius: 8px; padding: 12px; }
-    .row { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 12px; }
-    label { font-size: 12px; color: var(--muted); }
-    select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #334155; background: #0b1220; color: var(--text); }
-    button { background: #1f2937; color: var(--text); border: 1px solid #334155; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
-    button:hover { background: #243041; }
-    button.primary { background: #1d4ed8; border-color: #2563eb; }
-    button.primary:hover { background: #1e40af; }
-    button[disabled] { opacity: 0.6; cursor: not-allowed; }
-    .muted { color: var(--muted); }
-    .ok { color: var(--ok); }
-    .err { color: var(--err); }
-    .warn { color: var(--warn); }
-    .status { min-height: 20px; font-size: 12px; }
 
-    /* Commands tree */
-    .tree { list-style: none; margin: 0; padding: 0; }
-    .tree li { margin: 0; padding: 4px 0 4px 10px; border-left: 1px dotted #374151; position: relative; }
-    .tree li::before { content: ''; position: absolute; left: -1px; top: 12px; width: 8px; height: 1px; background: #374151; }
-    details { margin: 4px 0; }
-    summary { cursor: pointer; user-select: none; }
-    .cmd { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
-    .cmd .name { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
-    .badge { font-size: 10px; padding: 2px 6px; border-radius: 999px; border: 1px solid #374151; color: var(--muted); }
-    .badge.disabled { color: var(--disabled); border-color: #4b5563; }
-    .small { font-size: 12px; }
-    .flex { display: flex; align-items: center; gap: 8px; }
-    .space { flex: 1; }
-    .hr { border-top: 1px solid #1f2937; margin: 8px 0; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #0b1220;
+      border-bottom: 1px solid #1f2937;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    header a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 13px;
+      transition: opacity 0.2s;
+    }
+
+    header a:hover { opacity: 0.8; }
+
+    main {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 20px;
+      padding: 20px;
+      flex: 1;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .panel {
+      background: var(--panel);
+      border-radius: var(--radius);
+      box-shadow: var(--card-shadow);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .row { margin-bottom: 14px; }
+
+    label {
+      font-size: 13px;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    select, button {
+      width: 100%;
+      border-radius: 8px;
+      padding: 8px 10px;
+      border: 1px solid #334155;
+      background: #0b1220;
+      color: var(--text);
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+
+    select:focus, button:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    button {
+      cursor: pointer;
+      background: #1e293b;
+    }
+
+    button:hover { background: #334155; }
+
+    button.primary {
+      background: var(--accent);
+      border: none;
+      color: white;
+      font-weight: 500;
+    }
+
+    button.primary:hover { background: #2563eb; }
+
+    button[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      min-height: 22px;
+      font-size: 13px;
+      font-weight: 400;
+      margin-top: 4px;
+    }
+
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .err { color: var(--err); }
+    .muted { color: var(--muted); }
+
+    /* Command Tree */
+    #commandsPanel {
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    .tree {
+      list-style: none;
+      margin: 0;
+      padding-left: 12px;
+      font-size: 13px;
+    }
+
+    .tree li {
+      margin: 6px 0;
+      position: relative;
+      padding-left: 12px;
+    }
+
+    .tree li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 8px;
+      height: 1px;
+      background: #374151;
+      transform: translateY(-50%);
+    }
+
+    details {
+      border-left: 1px dotted #374151;
+      padding-left: 8px;
+    }
+
+    summary {
+      cursor: pointer;
+      user-select: none;
+      padding: 4px 0;
+      color: var(--text);
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+
+    summary:hover { color: var(--accent); }
+
+    .cmd {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .cmd .name {
+      font-family: monospace;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid #475569;
+      color: var(--muted);
+      margin-left: 6px;
+    }
+
+    .badge.disabled {
+      opacity: 0.6;
+    }
+
+    .tip {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid #1f2937;
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>Broadlink Controller</h1>
-    <a href="/doc/openapi.json" target="_blank" rel="noreferrer">OpenAPI</a>
+    <a href="/doc/openapi.json" target="_blank">OpenAPI Docs ↗</a>
   </header>
   <main>
     <section class="panel">
@@ -68,23 +231,22 @@
         <select id="device"></select>
       </div>
       <div class="row">
-        <button id="refresh" class="primary">Refresh</button>
+        <button id="refresh" class="primary">🔄 Refresh</button>
       </div>
-      <div class="row">
-        <div class="status" id="status"></div>
-      </div>
-      <div class="hr"></div>
-      <div class="small muted">
-        Tip: Click group headers to expand/collapse. Use buttons to send commands.
-      </div>
+      <div class="status" id="status"></div>
+      <div class="tip">💡 Tip: Expand groups to view commands. Click <b>Send</b> to execute.</div>
     </section>
 
     <section class="panel" id="commandsPanel">
-      <h3 class="small muted" id="deviceTitle">Select a controller and device.</h3>
-      <ul class="tree" id="commands"></ul>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 class="muted" id="deviceTitle">Select a controller and device.</h3>
+            <button id="toggleDisabled" style="width: auto; padding: 4px 8px; font-size: 12px;" class="primary">
+                Show disabled
+            </button>
+        </div>
+        <ul class="tree" id="commands"></ul>
     </section>
   </main>
-
   <script>
     const $ = (sel) => document.querySelector(sel);
     const controllerSel = $('#controller');
@@ -92,6 +254,8 @@
     const statusEl = $('#status');
     const commandsEl = $('#commands');
     const deviceTitle = $('#deviceTitle');
+    const toggleDisabledBtn = $('#toggleDisabled');
+    let showDisabled = false;
 
     function setStatus(msg, cls = 'muted') {
       statusEl.className = 'status ' + cls;
@@ -208,6 +372,7 @@
     function renderGroupItem(cName, dName, parentPath, group) {
       const li = document.createElement('li');
       const details = document.createElement('details');
+      details.open = true;
       const summary = document.createElement('summary');
       const title = document.createElement('span');
       title.textContent = group.name;
@@ -249,7 +414,15 @@
       try {
         const data = await fetchJSON(`/${encodeURIComponent(c)}/${encodeURIComponent(d)}`);
         renderCommandsTree(data, c, d);
-        setStatus('Commands loaded.', 'ok');
+          // Initially hide disabled items
+          const items = commandsEl.querySelectorAll('.cmd, details');
+          items.forEach(item => {
+              const isDisabled = item.querySelector('.badge.disabled');
+              if (isDisabled) {
+                  item.closest('li').style.display = showDisabled ? '' : 'none';
+              }
+          });
+          setStatus('Commands loaded.', 'ok');
       } catch (e) {
         setStatus(e.message, 'err');
       }
@@ -269,6 +442,17 @@
     controllerSel.addEventListener('change', loadDevices);
     deviceSel.addEventListener('change', loadCommands);
     $('#refresh').addEventListener('click', loadControllers);
+    toggleDisabledBtn.addEventListener('click', () => {
+        showDisabled = !showDisabled;
+        toggleDisabledBtn.textContent = showDisabled ? 'Hide disabled' : 'Show disabled';
+        const items = commandsEl.querySelectorAll('.cmd, details');
+        items.forEach(item => {
+            const isDisabled = item.querySelector('.badge.disabled');
+            if (isDisabled) {
+                item.closest('li').style.display = showDisabled ? '' : 'none';
+            }
+        });
+    });
 
     // Initial load
     loadControllers();
