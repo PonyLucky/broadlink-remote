@@ -23,12 +23,12 @@ COPY . /app
 
 # 6) Python dependencies
 # Minimal set per README; add others if your project grows
-RUN pip install flask python-dotenv broadlink gunicorn
+RUN pip install flask python-dotenv broadlink waitress
 
 # 7) Expose the HTTP port
-EXPOSE 5000
+EXPOSE 6676
 
 # 8) Default command
 # Use Gunicorn in production; it will create the Flask app via the factory
 # You can adjust workers/threads based on your environment
-CMD ["gunicorn", "--factory", "-w", "2", "-b", "0.0.0.0:5000", "app_factory:create_app"]
+CMD ["waitress-serve", "--listen=*:6676", "--call", "src.app_factory:create_app"]
