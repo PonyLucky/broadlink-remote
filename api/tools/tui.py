@@ -81,7 +81,7 @@ def save_xml(tree: ET.ElementTree, path: str) -> None:
 
 
 def find_controller(root: ET.Element, name: str) -> Optional[ET.Element]:
-    for c in root.findall('controler'):
+    for c in root.findall('controller'):
         if c.get('name') == name:
             return c
     return None
@@ -92,7 +92,7 @@ def upsert_controller(root: ET.Element, *, name: str, ip: str, port: int,
                       friendly_name: Optional[str]) -> ET.Element:
     c = find_controller(root, name)
     if c is None:
-        c = ET.SubElement(root, 'controler')  # Keep tag name consistent with existing file
+        c = ET.SubElement(root, 'controller')  # Keep tag name consistent with existing file
     # Update attributes
     c.set('name', name)
     if friendly_name:
@@ -335,7 +335,7 @@ def action_add_controller_manual(tree: ET.ElementTree) -> None:
 
 
 def pick_controller(root: ET.Element) -> Optional[ET.Element]:
-    ctrls = root.findall('controler')
+    ctrls = root.findall('controller')
     if not ctrls:
         print("No controllers found in XML. Add one first (discover or manual).")
         return None
@@ -454,7 +454,7 @@ def action_learn_command(tree: ET.ElementTree, rf: bool = False) -> None:
 
 def action_list_controllers(tree: ET.ElementTree) -> None:
     root = tree.getroot()
-    ctrls = root.findall('controler')
+    ctrls = root.findall('controller')
     if not ctrls:
         print("No controllers stored yet.")
         return

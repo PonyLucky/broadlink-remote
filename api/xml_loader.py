@@ -26,7 +26,7 @@ class Config:
         tree = ET.parse(path)
         root = tree.getroot()
         controllers: Dict[str, Controller] = {}
-        for c_el in root.findall('controler'):
+        for c_el in root.findall('controller'):
             c_name = c_el.get('name')
             if not c_name:
                 continue

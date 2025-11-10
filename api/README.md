@@ -99,7 +99,7 @@ Responses are JSON. Error responses use proper HTTP status codes with a short de
 ## Configuration: broadlink.xml
 
 The XML file at `api/broadlink.xml` holds:
-- Controllers (`<controler>`): IP, port, dev type, MAC, model, friendly name
+- Controllers (`<controller>`): IP, port, dev type, MAC, model, friendly name
 - Devices (`<device>`): type (e.g., `ir` or `rf`), manufacturer, model, friendly name
 - Commands: hex payloads to be sent by the controller
 
