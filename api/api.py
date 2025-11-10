@@ -1,9 +1,11 @@
 from flask import Blueprint, jsonify, abort
 from typing import List
+import time
 
 from openapi_spec import build_openapi
 from xml_loader import Config
 from bl_client import mac_str_to_bytes, send_via_broadlink, is_broadlink_available
+from models import SendStep, WaitStep
 
 
 def create_api_blueprint(cfg: Config, prefix: str) -> Blueprint:
@@ -54,27 +56,25 @@ def create_api_blueprint(cfg: Config, prefix: str) -> Blueprint:
             abort(404, description=f'Device {d_name} on controller {c_name} not found')
         return jsonify(cfg.list_commands(device))
 
-    @api.post('/<c_name>/<d_name>/<path:cmd_name>')
-    def send_command(c_name: str, d_name: str, cmd_name: str):
-        device = cfg.get_device(c_name, d_name)
+    def _send_device_command(ctrl_name: str, device_name: str, command_path: str) -> None:
+        device = cfg.get_device(ctrl_name, device_name)
         if not device:
-            abort(404, description=f'Device {d_name} on controller {c_name} not found')
-        parts: List[str] = cmd_name.split('.') if cmd_name else []
+            abort(404, description=f'Device {device_name} on controller {ctrl_name} not found')
+        parts: List[str] = command_path.split('.') if command_path else []
         if not parts:
             abort(400, description='cmd_name required')
         cmd = cfg.resolve_command(device, parts)
         if not cmd:
-            abort(404, description=f'Command {cmd_name} not found')
+            abort(404, description=f'Command {command_path} not found')
         if cmd.disabled:
-            abort(403, description=f'Command {cmd_name} is disabled')
+            abort(403, description=f'Command {command_path} is disabled')
 
-        ctrl = cfg.get_controller(c_name)
+        ctrl = cfg.get_controller(ctrl_name)
         if not ctrl:
-            abort(404, description=f'Controller {c_name} not found')
+            abort(404, description=f'Controller {ctrl_name} not found')
         if not is_broadlink_available():
             abort(500, description='broadlink library not available')
 
-        # Prepare and send
         payload_hex = cmd.payload_hex.replace('\n', '').replace('\r', '').strip()
         if not payload_hex:
             abort(400, description='Empty command payload')
@@ -99,6 +99,45 @@ def create_api_blueprint(cfg: Config, prefix: str) -> Blueprint:
         if not ok:
             abort(502, description=f'Failed to send command: {err or "unknown error"}')
 
+    @api.post('/<c_name>/<d_name>/<path:cmd_name>')
+    def send_command(c_name: str, d_name: str, cmd_name: str):
+        _send_device_command(c_name, d_name, cmd_name)
         return jsonify({'status': 'ok', 'controller': c_name, 'device': d_name, 'command': cmd_name})
+
+    # Scripts routes
+    @api.get('/<c_name>/scripts')
+    def list_scripts(c_name: str):
+        items = cfg.list_scripts(c_name)
+        if items is None:
+            abort(404, description=f'Controller {c_name} not found')
+        return jsonify(items)
+
+    @api.get('/<c_name>/scripts/<s_name>')
+    def show_script(c_name: str, s_name: str):
+        sc = cfg.get_script(c_name, s_name)
+        if not sc:
+            abort(404, description=f'Scriptlet {s_name} on controller {c_name} not found')
+        # Serialize steps
+        steps = []
+        for st in sc.steps:
+            if isinstance(st, WaitStep):
+                steps.append({'type': 'wait', 'time': st.time_ms})
+            elif isinstance(st, SendStep):
+                steps.append({'type': 'send', 'device': st.device, 'command': st.command_path})
+        return jsonify({'name': sc.name, 'friendly_name': sc.friendly_name, 'steps': steps})
+
+    @api.post('/<c_name>/scripts/<s_name>')
+    def run_script(c_name: str, s_name: str):
+        sc = cfg.get_script(c_name, s_name)
+        if not sc:
+            abort(404, description=f'Scriptlet {s_name} on controller {c_name} not found')
+        for st in sc.steps:
+            if isinstance(st, WaitStep):
+                delay = max(0, st.time_ms) / 1000.0
+                if delay > 0:
+                    time.sleep(delay)
+            elif isinstance(st, SendStep):
+                _send_device_command(c_name, st.device, st.command_path)
+        return jsonify({'status': 'ok', 'controller': c_name, 'scriptlet': s_name})
 
     return api

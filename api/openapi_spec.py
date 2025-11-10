@@ -48,6 +48,39 @@ def build_openapi() -> Dict[str, Any]:
                         '502': {'description': 'Failed to send'}
                     }
                 }
+            },
+            '/{c_name}/scripts': {
+                'get': {
+                    'summary': 'List scripts for a controller',
+                    'parameters': [
+                        {'name': 'c_name', 'in': 'path', 'required': True, 'schema': {'type': 'string'}}
+                    ],
+                    'responses': {'200': {'description': 'OK'}, '404': {'description': 'Not found'}}
+                }
+            },
+            '/{c_name}/scripts/{s_name}': {
+                'get': {
+                    'summary': 'Show content of a scriptlet',
+                    'parameters': [
+                        {'name': 'c_name', 'in': 'path', 'required': True, 'schema': {'type': 'string'}},
+                        {'name': 's_name', 'in': 'path', 'required': True, 'schema': {'type': 'string'}}
+                    ],
+                    'responses': {'200': {'description': 'OK'}, '404': {'description': 'Not found'}}
+                },
+                'post': {
+                    'summary': 'Run a scriptlet',
+                    'parameters': [
+                        {'name': 'c_name', 'in': 'path', 'required': True, 'schema': {'type': 'string'}},
+                        {'name': 's_name', 'in': 'path', 'required': True, 'schema': {'type': 'string'}}
+                    ],
+                    'responses': {
+                        '200': {'description': 'OK'},
+                        '400': {'description': 'Bad request'},
+                        '403': {'description': 'Forbidden'},
+                        '404': {'description': 'Not found'},
+                        '502': {'description': 'Failed to send'}
+                    }
+                }
             }
         }
     }

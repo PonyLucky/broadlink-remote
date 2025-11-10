@@ -3,7 +3,7 @@ import time
 from typing import Dict, Any, List, Optional
 import xml.etree.ElementTree as ET
 
-from models import Command, Group, Device, Controller
+from models import Command, Group, Device, Controller, Scriptlet, ScriptStep, SendStep, WaitStep
 
 
 class Config:
@@ -77,6 +77,35 @@ class Config:
                     grp = self._parse_group(g_el)
                     device.groups[grp.name] = grp
                 controller.devices[device.name] = device
+
+            # Scripts section
+            scripts_el = c_el.find('scripts')
+            controller.scripts = {}
+            if scripts_el is not None:
+                for sc_el in scripts_el.findall('scriptlet'):
+                    s_name = sc_el.get('name')
+                    if not s_name:
+                        continue
+                    s_friendly = sc_el.get('friendly-name') or sc_el.get('frendly-name')
+                    script = Scriptlet(name=s_name, friendly_name=s_friendly, steps=[])
+                    # Steps can be <send> or <wait>
+                    for step_el in list(sc_el):
+                        tag = step_el.tag.lower()
+                        if tag == 'send':
+                            dev = step_el.get('device') or ''
+                            cmd = step_el.get('command') or ''
+                            if not dev or not cmd:
+                                continue
+                            script.steps.append(SendStep(device=dev, command_path=cmd))
+                        elif tag == 'wait':
+                            t = step_el.get('time')
+                            try:
+                                t_ms = int(t) if t is not None else 0
+                            except ValueError:
+                                t_ms = 0
+                            script.steps.append(WaitStep(time_ms=t_ms))
+                    controller.scripts[s_name] = script
+
             controllers[controller.name] = controller
         return controllers
 
@@ -116,6 +145,28 @@ class Config:
         if not ctrl:
             return None
         return ctrl.devices.get(d_name)
+
+    # Scripts helpers
+    def list_scripts(self, c_name: str) -> Optional[List[Dict[str, Any]]]:
+        ctrl = self.get_controller(c_name)
+        if not ctrl:
+            return None
+        out: List[Dict[str, Any]] = []
+        for name, sc in sorted(ctrl.scripts.items()):
+            steps: List[Dict[str, Any]] = []
+            for st in sc.steps:
+                if isinstance(st, WaitStep):
+                    steps.append({'type': 'wait', 'time': st.time_ms})
+                elif isinstance(st, SendStep):
+                    steps.append({'type': 'send', 'device': st.device, 'command': st.command_path})
+            out.append({'name': name, 'friendly_name': sc.friendly_name, 'steps': steps})
+        return out
+
+    def get_script(self, c_name: str, s_name: str) -> Optional[Scriptlet]:
+        ctrl = self.get_controller(c_name)
+        if not ctrl:
+            return None
+        return ctrl.scripts.get(s_name)
 
     def list_commands(self, device: Device) -> Dict[str, Any]:
         def cmd_to_dict(n: str, cmd: Command, parent_disabled: bool = False) -> Dict[str, Any]:

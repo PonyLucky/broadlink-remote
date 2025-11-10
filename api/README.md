@@ -77,6 +77,9 @@ The API is mounted at `/api`. Key endpoints:
 - `GET /api/<controller>/device` — List devices under a controller
 - `GET /api/<controller>/<device>` — List available commands for a device
 - `POST /api/<controller>/<device>/<command.path>` — Send a command (dot-separated nested names allowed)
+- `GET /api/<controller>/scripts` — List scripts for a controller
+- `GET /api/<controller>/scripts/<scriptlet>` — Show content (steps) of a scriptlet
+- `POST /api/<controller>/scripts/<scriptlet>` — Run a scriptlet (sequentially executes its steps)
 
 Example usages:
 
@@ -102,8 +105,46 @@ The XML file at `api/broadlink.xml` holds:
 - Controllers (`<controller>`): IP, port, dev type, MAC, model, friendly name
 - Devices (`<device>`): type (e.g., `ir` or `rf`), manufacturer, model, friendly name
 - Commands: hex payloads to be sent by the controller
+- Scripts: reusable sequences of steps under each controller
 
 You can manage this file manually or via the TUI tool (see below).
+
+### Scripts and scriptlets
+
+Under a controller you can now define a `<scripts>` section with one or more `<scriptlet>` entries. Each scriptlet contains steps executed sequentially. Supported steps:
+- `<send device="<device_name>" command="<command_or_path>"/>` — send a command to a device. `command` can be a simple command name or a dot-separated path into groups (same as the `POST /<controller>/<device>/<command.path>` endpoint).
+- `<wait time="<milliseconds>"/>` — pause execution for the specified amount of time (required `time` attribute, integer milliseconds).
+
+Example:
+
+```
+<controller ...>
+  ...
+  <scripts>
+    <scriptlet name="music" friendly-name="Musique">
+      <send device="amp" command="power"/>
+      <wait time="500"/>
+      <send device="network_player" command="power"/>
+    </scriptlet>
+  </scripts>
+</controller>
+```
+
+Run this scriptlet with:
+
+```
+curl -X POST http://localhost:5000/api/bedroom/scripts/music
+```
+
+Inspect scripts:
+
+```
+# List scripts for a controller
+curl http://localhost:5000/api/bedroom/scripts
+
+# Show a scriptlet's content
+curl http://localhost:5000/api/bedroom/scripts/music
+```
 
 ## Tools
 

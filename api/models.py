@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Union
 
 
 @dataclass
@@ -34,6 +34,28 @@ class Device:
     groups: Dict[str, Group] = field(default_factory=dict)
 
 
+# Scripts
+@dataclass
+class WaitStep:
+    time_ms: int
+
+
+@dataclass
+class SendStep:
+    device: str
+    command_path: str  # dot-separated path
+
+
+ScriptStep = Union[WaitStep, SendStep]
+
+
+@dataclass
+class Scriptlet:
+    name: str
+    friendly_name: Optional[str]
+    steps: List[ScriptStep] = field(default_factory=list)
+
+
 @dataclass
 class Controller:
     name: str
@@ -44,3 +66,4 @@ class Controller:
     mac: str
     model: Optional[str]
     devices: Dict[str, Device] = field(default_factory=dict)
+    scripts: Dict[str, Scriptlet] = field(default_factory=dict)
