@@ -33,7 +33,6 @@ const scriptBody = $('#scriptBody');
 const scriptRunBtn = $('#scriptRunBtn');
 
 const API_PATH = '/api';
-const API_PORT = 5000;
 
 // LocalStorage keys and helpers
 const LS_KEYS = {
@@ -192,16 +191,8 @@ function setStatus(msg, cls = 'muted') {
   }
 }
 
-function getAPIUrl(path) {
-  let url = window.location.toString();
-  if (url.endsWith('/')) url = url.slice(0, -1);
-  url = url.replace(/:(\d+)(?=\/|$)/, '');  // Remove port number
-  url += ':' + API_PORT.toString() + API_PATH;
-  return url + path;
-}
-
 async function fetchJSON(path, options) {
-  const res = await fetch(getAPIUrl(path), options);
+  const res = await fetch(API_PATH + path, options);
   if (!res.ok) {
     let detail;
     try {
