@@ -35,6 +35,39 @@ Once running:
 - Static files: http://localhost:5000/static/
 - OpenAPI: http://localhost:5000/api/doc/openapi.json
 
+## Docker
+
+You can run the API and static UI in a container using the provided `Dockerfile`.
+
+Build the image:
+
+```
+# From this directory
+docker build -t broadlinkremote-api .
+```
+
+Run the container (exposing port 5000 and mounting your XML config read-only):
+
+```
+docker run --rm -p 5000:5000 \
+  -e FLASK_DEBUG=false \
+  -e FLASK_ENV=production \
+  -v "$PWD/broadlink.xml":/app/broadlink.xml:ro \
+  --name broadlink-api broadlinkremote-api
+```
+
+Notes:
+- Networking: Default bridge networking works for most setups. If your Broadlink device is only reachable on the host network (especially on Linux), you can use host networking:
+  - Linux: `docker run --rm --network host broadlinkremote-api`
+- Configuration: The app reads `broadlink.xml` from `/app/broadlink.xml`. Mount your local file into the container as shown above.
+- Ports: The container listens on `0.0.0.0:5000` by default. Change the published port if needed, e.g. `-p 8080:5000`.
+- Environment variables:
+  - `FLASK_HOST` (default: `0.0.0.0`)
+  - `FLASK_PORT` (default: `5000`)
+  - `FLASK_DEBUG` (`true`/`false`, default: `false`)
+  - `FLASK_ENV` (set to `development` to always reload XML on each request)
+- Deterministic installs: If you add a `requirements.txt` later, consider updating the `Dockerfile` to copy it first and run `pip install -r requirements.txt` for better layer caching.
+
 ## API overview
 
 The API is mounted at `/api`. Key endpoints:
