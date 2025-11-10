@@ -2,7 +2,7 @@
 # Purpose: Build a minimal image to run the Flask API + static UI
 
 # 1) Base image
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 # 2) Environment settings for reliable containerized Python
 ENV PYTHONDONTWRITEBYTECODE=1 \
