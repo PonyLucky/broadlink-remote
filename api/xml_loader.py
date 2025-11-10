@@ -118,25 +118,27 @@ class Config:
         return ctrl.devices.get(d_name)
 
     def list_commands(self, device: Device) -> Dict[str, Any]:
-        def cmd_to_dict(n: str, cmd: Command) -> Dict[str, Any]:
+        def cmd_to_dict(n: str, cmd: Command, parent_disabled: bool = False) -> Dict[str, Any]:
+            effective_disabled = cmd.disabled or parent_disabled
             data: Dict[str, Any] = {
                 'name': n,
-                'disabled': cmd.disabled,
+                'disabled': effective_disabled,
             }
             # Include positional attributes if present
             if cmd.x is not None and cmd.y is not None and cmd.width is not None and cmd.height is not None:
                 data.update({'x': cmd.x, 'y': cmd.y, 'width': cmd.width, 'height': cmd.height})
             return data
 
-        def group_to_dict(g: Group) -> Dict[str, Any]:
+        def group_to_dict(g: Group, parent_disabled: bool = False) -> Dict[str, Any]:
+            effective_group_disabled = parent_disabled or g.disabled
             return {
                 'name': g.name,
-                'disabled': g.disabled,
+                'disabled': effective_group_disabled,
                 'commands': [
-                    cmd_to_dict(n, cmd)
+                    cmd_to_dict(n, cmd, effective_group_disabled)
                     for n, cmd in sorted(g.commands.items())
                 ],
-                'groups': [group_to_dict(sg) for _, sg in sorted(g.subgroups.items())]
+                'groups': [group_to_dict(sg, effective_group_disabled) for _, sg in sorted(g.subgroups.items())]
             }
 
         return {
@@ -154,20 +156,40 @@ class Config:
         # Try direct command name first (no group)
         if len(path) == 1 and path[0] in device.commands:
             return device.commands[path[0]]
-        # Traverse groups
-        def traverse(gmap: Dict[str, Group], idx: int) -> Optional[Command]:
+
+        def clone_with_disabled(cmd: Command, disabled: bool) -> Command:
+            # Return a shallow copy with overridden disabled flag
+            return Command(
+                name=cmd.name,
+                payload_hex=cmd.payload_hex,
+                disabled=disabled,
+                x=cmd.x,
+                y=cmd.y,
+                width=cmd.width,
+                height=cmd.height,
+            )
+
+        # Traverse groups, carrying effective disabled state from parent groups
+        def traverse(gmap: Dict[str, Group], idx: int, parent_disabled: bool = False) -> Optional[Command]:
             if idx >= len(path):
                 return None
             g = gmap.get(path[idx])
             if not g:
                 return None
-            # If last segment -> must be command
+            effective_disabled = parent_disabled or g.disabled
+            # If last segment -> could be command with same name as this group (edge case)
             if idx == len(path) - 1:
-                return g.commands.get(path[idx])  # command same name as group unlikely
+                cmd = g.commands.get(path[idx])
+                if cmd is None:
+                    return None
+                return clone_with_disabled(cmd, cmd.disabled or effective_disabled)
             # If one segment left -> command name inside this group
             if idx == len(path) - 2:
-                return g.commands.get(path[idx + 1])
+                cmd = g.commands.get(path[idx + 1])
+                if cmd is None:
+                    return None
+                return clone_with_disabled(cmd, cmd.disabled or effective_disabled)
             # Otherwise go deeper into subgroups
-            return traverse(g.subgroups, idx + 1)
+            return traverse(g.subgroups, idx + 1, effective_disabled)
 
         return traverse(device.groups, 0)
