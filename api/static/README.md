@@ -15,6 +15,7 @@ This directory contains the single-page UI served by Flask:
 
 ### Main UI features
 
+- Scripts panel: lists scriptlets for the selected controller with actions to View steps or Run the scriptlet.
 - View toggle: "list" and "fancy" views for commands
 - Filters modal:
   - Select controller
@@ -22,12 +23,21 @@ This directory contains the single-page UI served by Flask:
   - Toggle visibility of disabled commands
 - Commands panel lists available commands for the selected controller/devices. Clicking a command sends it via the API.
 
+#### Scripts panel usage
+
+- Select a controller via Filters.
+- The Scripts panel shows all scriptlets defined under that controller in `broadlink.xml`.
+- Click "View" to see the steps (send/wait) in a modal; click "Run" to execute synchronously.
+
 ### Key API endpoints used
 
 - `GET /api/controller` — list controllers
 - `GET /api/<controller>/device` — list devices for a controller
 - `GET /api/<controller>/<device>` — list device commands
 - `POST /api/<controller>/<device>/<command.path>` — send command
+- `GET /api/<controller>/scripts` — list scripts
+- `GET /api/<controller>/scripts/<scriptlet>` — show scriptlet content
+- `POST /api/<controller>/scripts/<scriptlet>` — run a scriptlet
 
 ## Development tips
 

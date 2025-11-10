@@ -221,7 +221,7 @@ summary:hover { color: var(--accent); }
 .cmd {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: start;
   gap: 8px;
 }
 
@@ -344,6 +344,33 @@ summary:hover { color: var(--accent); }
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* Scripts panel */
+#scriptsPanel {
+  margin-bottom: 16px;
+}
+#scriptsPanel h2 {
+  margin: 4px 0 10px;
+  font-size: 16px;
+}
+.scripts-list { min-height: 32px; }
+.scripts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+.script-card {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px;
+  background: #0b1220;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.script-title { font-size: 14px; color: var(--text); }
+.script-actions { display: flex; gap: 8px; }
 
 /* Modal styles */
 body.modal-open { overflow: hidden; }

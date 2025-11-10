@@ -7,6 +7,10 @@ const devicesSelectAll = $('#devicesSelectAll');
 const commandsEl = $('#commands');
 const showDisabledChk = $('#showDisabled');
 
+// Scripts elements
+const scriptsPanel = $('#scriptsPanel');
+const scriptsEl = $('#scripts');
+
 // View toggle elements
 const viewFancyBtn = $('#viewFancyBtn');
 const viewListBtn = $('#viewListBtn');
@@ -20,6 +24,13 @@ const filtersOverlay = $('#filtersOverlay');
 const filtersModal = $('#filtersModal');
 const filtersClose = $('#filtersClose');
 const filtersApply = $('#filtersApply');
+
+// Script details modal
+const scriptOverlay = $('#scriptOverlay');
+const scriptModal = $('#scriptModal');
+const scriptClose = $('#scriptClose');
+const scriptBody = $('#scriptBody');
+const scriptRunBtn = $('#scriptRunBtn');
 
 const API_PATH = '/api';
 const API_PORT = 5000;
@@ -237,20 +248,25 @@ async function loadDevices() {
   const c = decodeURIComponent(controllerSel.value || '');
   resetDevicesDropdown();
   commandsEl.innerHTML = '';
-  if (!c) return;
+  if (!c) {
+    if (scriptsEl) scriptsEl.innerHTML = '<p class="muted">Select a controller to see scripts.</p>';
+    return;
+  }
   setStatus(`Loading devices for ${c}...`, 'muted');
   try {
     const devices = await fetchJSON(`/${encodeURIComponent(c)}/device`);
     if (!devices.length) {
       setStatus('No devices found for controller.', 'warn');
-      return;
+    } else {
+      setDevicesInDropdown(devices);
+      await loadSelectedDevicesCommands();
+      setStatus('Devices loaded.', 'ok');
     }
-    setDevicesInDropdown(devices);
-    await loadSelectedDevicesCommands();
-    setStatus('Devices loaded.', 'ok');
   } catch (e) {
     setStatus(e.message, 'err');
   }
+  // Always (re)load scripts after devices attempt
+  await loadScripts();
 }
 
 function renderCommandsTreeInto(container, data, cName, dName) {
@@ -488,33 +504,186 @@ filtersClose?.addEventListener('click', closeFiltersModal);
 filtersApply?.addEventListener('click', closeFiltersModal);
 filtersOverlay?.addEventListener('click', closeFiltersModal);
 
+// Script details modal helpers
+let scriptModalLastFocus = null;
+function isScriptModalOpen() {
+  return !!(scriptModal && !scriptModal.hasAttribute('hidden'));
+}
+function openScriptModal() {
+  if (!scriptModal || !scriptOverlay) return;
+  scriptModalLastFocus = document.activeElement;
+  scriptOverlay.hidden = false;
+  scriptModal.hidden = false;
+  document.body.classList.add('modal-open');
+  const focusable = scriptModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (focusable.length) /** @type {HTMLElement} */(focusable[0]).focus();
+}
+function closeScriptModal() {
+  if (!scriptModal || !scriptOverlay) return;
+  scriptOverlay.hidden = true;
+  scriptModal.hidden = true;
+  document.body.classList.remove('modal-open');
+  if (scriptModalLastFocus && typeof scriptModalLastFocus.focus === 'function') scriptModalLastFocus.focus();
+}
+scriptClose?.addEventListener('click', closeScriptModal);
+scriptOverlay?.addEventListener('click', closeScriptModal);
+
 // Close on Escape and trap focus inside modal when open
 document.addEventListener('keydown', (e) => {
-  if (!isModalOpen()) return;
-  if (e.key === 'Escape') {
-    e.preventDefault();
-    closeFiltersModal();
-    return;
-  }
-  if (e.key === 'Tab') {
-    const focusable = Array.from(filtersModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'));
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    const current = document.activeElement;
-    if (e.shiftKey) {
-      if (current === first || !filtersModal.contains(current)) {
-        e.preventDefault();
-        /** @type {HTMLElement} */(last).focus();
+  // Filters modal
+  if (isModalOpen()) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeFiltersModal();
+      return;
+    }
+    if (e.key === 'Tab') {
+      const focusable = Array.from(filtersModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const current = document.activeElement;
+      if (e.shiftKey) {
+        if (current === first || !filtersModal.contains(current)) {
+          e.preventDefault();
+          /** @type {HTMLElement} */(last).focus();
+        }
+      } else {
+        if (current === last) {
+          e.preventDefault();
+          /** @type {HTMLElement} */(first).focus();
+        }
       }
-    } else {
-      if (current === last) {
-        e.preventDefault();
-        /** @type {HTMLElement} */(first).focus();
+    }
+  }
+  // Script details modal
+  if (isScriptModalOpen()) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeScriptModal();
+      return;
+    }
+    if (e.key === 'Tab') {
+      const focusable = Array.from(scriptModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const current = document.activeElement;
+      if (e.shiftKey) {
+        if (current === first || !scriptModal.contains(current)) {
+          e.preventDefault();
+          /** @type {HTMLElement} */(last).focus();
+        }
+      } else {
+        if (current === last) {
+          e.preventDefault();
+          /** @type {HTMLElement} */(first).focus();
+        }
       }
     }
   }
 });
+
+// Scripts API and rendering
+async function loadScripts() {
+  const c = decodeURIComponent(controllerSel?.value || '');
+  if (!scriptsEl) return;
+  scriptsEl.innerHTML = '';
+  if (!c) {
+    scriptsEl.innerHTML = '<p class="muted">Select a controller to see scripts.</p>';
+    return;
+  }
+  try {
+    const items = await fetchJSON(`/${encodeURIComponent(c)}/scripts`);
+    renderScriptsList(c, items);
+  } catch (e) {
+    scriptsEl.innerHTML = `<p class="err">${e.message}</p>`;
+  }
+}
+
+function renderScriptsList(controller, items) {
+  if (!items || !items.length) {
+    scriptsEl.innerHTML = '<p class="muted">No scripts defined for this controller.</p>';
+    return;
+  }
+  const list = document.createElement('div');
+  list.className = 'scripts-grid';
+  items.forEach(sc => {
+    const card = document.createElement('div');
+    card.className = 'script-card';
+    const title = document.createElement('div');
+    title.className = 'script-title';
+    title.textContent = `${sc.friendly_name || sc.name} (${sc.name})`;
+    const actions = document.createElement('div');
+    actions.className = 'script-actions';
+    const btnRun = document.createElement('button');
+    btnRun.className = 'primary';
+    btnRun.textContent = 'Run';
+    btnRun.addEventListener('click', () => runScriptlet(controller, sc.name, btnRun));
+    const btnView = document.createElement('button');
+    btnView.textContent = 'View';
+    btnView.addEventListener('click', () => viewScript(controller, sc.name));
+    actions.appendChild(btnView);
+    actions.appendChild(btnRun);
+    card.appendChild(title);
+    card.appendChild(actions);
+    list.appendChild(card);
+  });
+  scriptsEl.appendChild(list);
+}
+
+async function viewScript(controller, name) {
+  try {
+    const sc = await fetchJSON(`/${encodeURIComponent(controller)}/scripts/${encodeURIComponent(name)}`);
+    // Build steps list
+    scriptBody.innerHTML = '';
+    const h = document.getElementById('scriptTitle');
+    if (h) h.textContent = `${sc.friendly_name || sc.name} (${sc.name})`;
+    const div = document.createElement('div');
+    (sc.steps || []).forEach((st, idx) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'cmd';
+      const name = document.createElement('span');
+      name.className = 'name';
+      if (st.type === 'wait') {
+        name.textContent = `wait ${st.time} ms`;
+      } else if (st.type === 'send') {
+        name.textContent = `send ${st.device}.${st.command}`;
+      } else {
+        name.textContent = JSON.stringify(st);
+      }
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = `#${idx+1}`;
+      const space = document.createElement('div');
+      space.className = 'space';
+      wrap.appendChild(badge);
+      wrap.appendChild(name);
+      wrap.appendChild(space);
+      div.appendChild(wrap);
+    });
+    scriptBody.appendChild(div);
+    scriptRunBtn.onclick = () => runScriptlet(controller, sc.name, scriptRunBtn);
+    openScriptModal();
+  } catch (e) {
+    scriptsEl.innerHTML = `<p class="err">${e.message}</p>`;
+  }
+}
+
+async function runScriptlet(controller, name, btn) {
+  const prev = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
+  setStatus(`Running script ${controller}/${name}...`, 'muted');
+  try {
+    const res = await fetchJSON(`/${encodeURIComponent(controller)}/scripts/${encodeURIComponent(name)}`, { method: 'POST' });
+    setStatus(`OK: ${res.status || 'ok'} — ${res.controller}/scripts/${res.scriptlet}`, 'ok');
+  } catch (e) {
+    setStatus(e.message, 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = prev || 'Run'; }
+    if (isScriptModalOpen()) closeScriptModal();
+  }
+}
 
 // View switching logic
 function setActiveView(mode) {
