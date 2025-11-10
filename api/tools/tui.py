@@ -5,8 +5,8 @@ Interactive TUI (text UI) to:
 - Learn new IR/RF commands for new or existing devices
 
 All data is stored in an XML file compatible with the application's
-broadlink.xml format. The XML is saved under the local scripts directory
-as scripts/broadlink.xml. If it doesn't exist, it will be created.
+broadlink.xml format. The XML is saved under the local tools directory
+as tools/broadlink.xml. If it doesn't exist, it will be created.
 
 Note: Positional attributes (x, y, width, height) are NOT handled yet,
       as requested. Commands will only include the name and payload.
@@ -25,7 +25,7 @@ except Exception:  # pragma: no cover
     print("This tool requires the 'broadlink' package.\nInstall with: pip install broadlink")
     sys.exit(1)
 
-# Where to save the XML (in the local scripts directory)
+# Where to save the XML (in the local tools directory)
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 XML_PATH = os.path.join(SCRIPTS_DIR, "broadlink.xml")
 
