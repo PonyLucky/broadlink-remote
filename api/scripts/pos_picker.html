@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Image Rectangle Picker (x, y, width, height)</title>
+  <style>
+    :root {
+      --bg: #0f1216;
+      --panel: #151a20;
+      --text: #e8eef7;
+      --muted: #9fb0c3;
+      --accent: #4aa3ff;
+      --accent-2: #7cd992;
+      --danger: #ff7676;
+      --border: #243041;
+      --rect-border: rgba(74, 163, 255, 0.95);
+      --rect-fill: rgba(74, 163, 255, 0.25);
+    }
+    html, body {
+      height: 100%;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      line-height: 1.45;
+    }
+    header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #121820, #0e131a);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 8px 0;
+      font-weight: 600;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    main {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 16px;
+      padding: 16px;
+    }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .picker-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+      min-height: 60vh;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .controls input[type="file"] {
+      color: var(--text);
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: #0e1620;
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .btn:hover { border-color: #2c3b52; }
+    .btn.primary { background: #103255; border-color: #174370; }
+    .btn.primary:hover { background: #113b64; }
+    .btn.danger { background: #3a1616; border-color: #522626; }
+
+    .dropzone {
+      border: 2px dashed #2a3a50;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      padding: 16px;
+      user-select: none;
+    }
+    .dropzone.dragover {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(74, 163, 255, 0.06);
+    }
+
+    .canvas-wrap {
+      position: relative;
+      overflow: auto;
+      background: #0b0f14;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      min-height: 300px;
+    }
+    .img-container {
+      position: relative;
+      display: inline-block; /* shrink to image */
+      cursor: crosshair;
+      -webkit-user-drag: none;
+      user-select: none;
+    }
+    .img-container img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      -webkit-user-drag: none;
+      user-drag: none;
+      pointer-events: none; /* so drag doesn't start native img drag */
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none; /* selection rect is drawn via JS but we listen on container */
+    }
+    .selection {
+      position: absolute;
+      border: 2px solid var(--rect-border);
+      background: var(--rect-fill);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.2) inset;
+      border-radius: 2px;
+      display: none;
+    }
+
+    .aside h3 {
+      margin: 6px 0 10px;
+      font-size: 16px;
+    }
+    .kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; }
+    .kv .label { color: var(--muted); }
+    .code {
+      margin-top: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: #0b0f14;
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #e1ecff;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 20px;
+      transform: translateX(-50%);
+      background: #0e2f52;
+      color: #e8f1ff;
+      border: 1px solid #174370;
+      padding: 8px 12px;
+      border-radius: 999px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease-out, transform .2s ease-out;
+      z-index: 20;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Rectangle Picker for Positional Attributes</h1>
+    <div class="sub">Open an image, then click and drag to draw a rectangle. On mouse up, x, y, width, height are displayed and copied to clipboard.</div>
+  </header>
+  <main>
+    <section class="panel picker-panel">
+      <div class="controls">
+        <input id="fileInput" type="file" accept="image/*" />
+        <button class="btn" id="btnClear">Clear selection</button>
+        <button class="btn primary" id="btnCopy" title="Copy again to clipboard">Copy</button>
+        <span class="hint">You can also drag & drop an image into the area below.</span>
+      </div>
+      <div class="dropzone" id="dropzone">
+        <div id="canvasWrap" class="canvas-wrap">
+          <!-- Image + overlay are injected here -->
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel aside">
+      <h3>Result</h3>
+      <div class="kv">
+        <div class="label">x</div><div id="valX">-</div>
+        <div class="label">y</div><div id="valY">-</div>
+        <div class="label">width</div><div id="valW">-</div>
+        <div class="label">height</div><div id="valH">-</div>
+      </div>
+      <div class="code" id="snippet">x="" y="" width="" height=""</div>
+      <div class="hint">Coordinates are in natural image pixels (top-left origin).</div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast">Copied to clipboard</div>
+
+  <script>
+    (function(){
+      const fileInput = document.getElementById('fileInput');
+      const dropzone = document.getElementById('dropzone');
+      const canvasWrap = document.getElementById('canvasWrap');
+      const btnClear = document.getElementById('btnClear');
+      const btnCopy = document.getElementById('btnCopy');
+      const valX = document.getElementById('valX');
+      const valY = document.getElementById('valY');
+      const valW = document.getElementById('valW');
+      const valH = document.getElementById('valH');
+      const snippet = document.getElementById('snippet');
+      const toast = document.getElementById('toast');
+
+      let imgEl = null; // <img>
+      let overlayEl = null; // overlay container
+      let rectEl = null; // selection rectangle
+
+      let dragging = false;
+      let start = { x: 0, y: 0 }; // in viewport CSS px
+      let current = { x: 0, y: 0 };
+
+      let result = { x: null, y: null, w: null, h: null }; // natural px
+
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 1500);
+      }
+
+      function clearSelection() {
+        if (rectEl) rectEl.style.display = 'none';
+        result = { x: null, y: null, w: null, h: null };
+        updateResultUI();
+      }
+
+      function updateResultUI() {
+        const {x, y, w, h} = result;
+        valX.textContent = x == null ? '-' : x;
+        valY.textContent = y == null ? '-' : y;
+        valW.textContent = w == null ? '-' : w;
+        valH.textContent = h == null ? '-' : h;
+        const snip = `x="${x ?? ''}" y="${y ?? ''}" width="${w ?? ''}" height="${h ?? ''}"`;
+        snippet.textContent = snip;
+        return snip;
+      }
+
+      function copyToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'))
+            .catch(() => fallbackCopy(text));
+        } else {
+          fallbackCopy(text);
+        }
+      }
+
+      function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); showToast('Copied to clipboard'); } catch {}
+        document.body.removeChild(ta);
+      }
+
+      function loadImageFromFile(file) {
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        insertImage(url);
+      }
+
+      function insertImage(src) {
+        canvasWrap.innerHTML = '';
+        const cont = document.createElement('div');
+        cont.className = 'img-container';
+        cont.addEventListener('dragstart', e => e.preventDefault());
+        cont.addEventListener('contextmenu', e => e.preventDefault());
+
+        const img = document.createElement('img');
+        img.alt = 'Loaded image';
+        img.decoding = 'async';
+        img.src = src;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        const rect = document.createElement('div');
+        rect.className = 'selection';
+        overlay.appendChild(rect);
+
+        cont.appendChild(img);
+        cont.appendChild(overlay);
+        canvasWrap.appendChild(cont);
+
+        img.addEventListener('load', () => {
+          imgEl = img; overlayEl = overlay; rectEl = rect;
+          clearSelection();
+          bindPointer(cont);
+        }, { once: true });
+      }
+
+      function bindPointer(cont) {
+        cont.addEventListener('mousedown', onDown);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        // Touch support (simple)
+        cont.addEventListener('touchstart', e => onDown(toMouseLike(e)), { passive: false });
+        window.addEventListener('touchmove', e => onMove(toMouseLike(e)), { passive: false });
+        window.addEventListener('touchend', e => onUp(toMouseLike(e)), { passive: false });
+      }
+
+      function toMouseLike(te) {
+        const t = te.changedTouches ? te.changedTouches[0] : te.touches ? te.touches[0] : null;
+        if (!t) return te;
+        te.preventDefault();
+        return {
+          type: te.type === 'touchend' ? 'mouseup' : te.type === 'touchmove' ? 'mousemove' : 'mousedown',
+          clientX: t.clientX,
+          clientY: t.clientY,
+          preventDefault: () => {}
+        };
+      }
+
+      function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+
+      function onDown(e) {
+        if (!imgEl) return;
+        e.preventDefault();
+        const r = imgEl.getBoundingClientRect();
+        start.x = clamp(e.clientX, r.left, r.right);
+        start.y = clamp(e.clientY, r.top, r.bottom);
+        dragging = true;
+        if (rectEl) {
+          rectEl.style.display = 'block';
+        }
+        updateRect(e);
+      }
+
+      function onMove(e) {
+        if (!dragging) return;
+        updateRect(e);
+      }
+
+      function onUp(e) {
+        if (!dragging) return;
+        updateRect(e);
+        dragging = false;
+        // compute final result and copy
+        const snip = updateResultUI();
+        if (result.x != null) {
+          copyToClipboard(snip);
+        }
+      }
+
+      function updateRect(e) {
+        if (!imgEl || !rectEl) return;
+        const r = imgEl.getBoundingClientRect();
+        current.x = clamp(e.clientX, r.left, r.right);
+        current.y = clamp(e.clientY, r.top, r.bottom);
+
+        const left = Math.min(start.x, current.x) - r.left;
+        const top = Math.min(start.y, current.y) - r.top;
+        const w = Math.abs(current.x - start.x);
+        const h = Math.abs(current.y - start.y);
+
+        // Position selection rectangle in CSS px
+        rectEl.style.left = left + 'px';
+        rectEl.style.top = top + 'px';
+        rectEl.style.width = w + 'px';
+        rectEl.style.height = h + 'px';
+
+        // Compute natural pixel coordinates
+        const displayedW = r.width;
+        const displayedH = r.height;
+        const natW = imgEl.naturalWidth || displayedW;
+        const natH = imgEl.naturalHeight || displayedH;
+        const scaleX = natW / displayedW;
+        const scaleY = natH / displayedH;
+
+        let x = Math.round(left * scaleX);
+        let y = Math.round(top * scaleY);
+        let nw = Math.round(w * scaleX);
+        let nh = Math.round(h * scaleY);
+
+        // Clamp into natural bounds, ensure minimum size 1 when dragging
+        x = clamp(x, 0, natW);
+        y = clamp(y, 0, natH);
+        if (dragging) {
+          nw = Math.max(1, Math.min(nw, natW - x));
+          nh = Math.max(1, Math.min(nh, natH - y));
+        } else {
+          nw = Math.min(nw, natW - x);
+          nh = Math.min(nh, natH - y);
+        }
+
+        result = { x, y, w: nw, h: nh };
+        updateResultUI();
+      }
+
+      // Wire: file input
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) loadImageFromFile(file);
+      });
+
+      // Wire: dropzone
+      ;['dragenter','dragover'].forEach(ev => dropzone.addEventListener(ev, e => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dragover');
+      }));
+      ;['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dragover');
+      }));
+      dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        if (!dt) return;
+        if (dt.files && dt.files.length) {
+          const file = dt.files[0];
+          if (file.type.startsWith('image/')) loadImageFromFile(file);
+        } else {
+          const url = dt.getData('text/uri-list') || dt.getData('text/plain');
+          if (url) insertImage(url);
+        }
+      });
+
+      btnClear.addEventListener('click', () => clearSelection());
+      btnCopy.addEventListener('click', () => {
+        const snip = updateResultUI();
+        if (snip.includes('""')) { showToast('No selection to copy'); return; }
+        copyToClipboard(snip);
+      });
+
+      // Provide a quick way to load a demo image if desired (commented)
+      // insertImage('../static/images/bedroom/network_player.png');
+    })();
+  </script>
+</body>
+</html>
