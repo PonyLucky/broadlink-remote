@@ -7,7 +7,7 @@ try:
 except Exception:
     pass
 
-from app_factory import create_app
+from src.app_factory import create_app
 
 
 def main():
