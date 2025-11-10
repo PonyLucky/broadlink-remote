@@ -2,10 +2,10 @@ from flask import Blueprint, jsonify, abort
 from typing import List
 import time
 
-from openapi_spec import build_openapi
-from xml_loader import Config
-from bl_client import mac_str_to_bytes, send_via_broadlink, is_broadlink_available
-from models import SendStep, WaitStep
+from src.openapi_spec import build_openapi
+from src.xml_loader import Config
+from src.bl_client import mac_str_to_bytes, send_via_broadlink, is_broadlink_available
+from src.models import SendStep, WaitStep
 
 
 def create_api_blueprint(cfg: Config, prefix: str) -> Blueprint:

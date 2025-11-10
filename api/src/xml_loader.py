@@ -3,7 +3,7 @@ import time
 from typing import Dict, Any, List, Optional
 import xml.etree.ElementTree as ET
 
-from models import Command, Group, Device, Controller, Scriptlet, ScriptStep, SendStep, WaitStep
+from src.models import Command, Group, Device, Controller, Scriptlet, ScriptStep, SendStep, WaitStep
 
 
 class Config:
