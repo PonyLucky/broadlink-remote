@@ -15,6 +15,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var statusItem: NSStatusItem!
     let config = BroadlinkConfig()
 
+    // API/cache
+    private var api: BroadlinkController?
+    // controller -> device -> tree
+    private var treeCache: [String: [String: BLNode]] = [:]
+    private var controllers: [BLControllerInfo] = []
+    private var isLoading: Bool = false
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        setupMenuBar()
+        updateStatusIcon()
+        refreshDevices()
+    }
+
     // MARK: - Clean Quit
     func cleanQuit() {
         print("🧹 BroadlinkRemote terminated cleanly.")
@@ -34,7 +47,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func setupMenu() {
         let menu = NSMenu()
 
+        // Refresh devices
+        let refreshItem = NSMenuItem(title: isLoading ? "Refreshing…" : "Refresh devices", action: #selector(onRefreshDevices), keyEquivalent: "r")
+        refreshItem.isEnabled = !isLoading
+        menu.addItem(refreshItem)
+
         // List of devices and their actions
+        buildDevicesMenu(into: menu)
 
         // ---
 
@@ -57,6 +76,113 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.title = ""
         }
         setupMenu()
+    }
+
+    // MARK: - Build Devices/Actions Menu
+    private func buildDevicesMenu(into menu: NSMenu) {
+        if isLoading {
+            let it = NSMenuItem()
+            it.title = "Loading devices…"
+            it.isEnabled = false
+            menu.addItem(it)
+            return
+        }
+        guard !controllers.isEmpty else {
+            let it = NSMenuItem()
+            it.title = "No controllers/devices"
+            it.isEnabled = false
+            menu.addItem(it)
+            return
+        }
+        for ctrl in controllers.sorted(by: { ($0.friendly_name ?? $0.name) < ($1.friendly_name ?? $1.name) }) {
+            let ctrlItem = NSMenuItem(title: ctrl.friendly_name ?? ctrl.name, action: nil, keyEquivalent: "")
+            let ctrlMenu = NSMenu(title: ctrl.name)
+            // Devices
+            let devMap = treeCache[ctrl.name] ?? [:]
+            if devMap.isEmpty {
+                let empty = NSMenuItem(title: "No devices", action: nil, keyEquivalent: "")
+                empty.isEnabled = false
+                ctrlMenu.addItem(empty)
+            } else {
+                for (devName, rootNode) in devMap.sorted(by: { $0.key < $1.key }) {
+                    let devTitle = devName
+                    let devItem = NSMenuItem(title: devTitle, action: nil, keyEquivalent: "")
+                    let devMenu = NSMenu(title: devTitle)
+                    buildTreeMenu(into: devMenu, controller: ctrl.name, device: devName, node: rootNode)
+                    devItem.submenu = devMenu
+                    ctrlMenu.addItem(devItem)
+                }
+            }
+            ctrlItem.submenu = ctrlMenu
+            menu.addItem(ctrlItem)
+        }
+    }
+
+    private func buildTreeMenu(into menu: NSMenu, controller: String, device: String, node: BLNode) {
+        for child in node.children.sorted(by: { $0.name < $1.name }) {
+            switch child.kind {
+            case .group:
+                let item = NSMenuItem(title: child.name + (child.disabled ? " (disabled)" : ""), action: nil, keyEquivalent: "")
+                item.isEnabled = !child.disabled
+                let sub = NSMenu(title: child.name)
+                buildTreeMenu(into: sub, controller: controller, device: device, node: child)
+                item.submenu = sub
+                menu.addItem(item)
+            case .command:
+                let item = NSMenuItem(title: child.name + (child.disabled ? " (disabled)" : ""), action: #selector(onSendCommand(_:)), keyEquivalent: "")
+                item.isEnabled = !child.disabled
+                item.representedObject = ["controller": controller, "device": device, "cmd": child.commandPath ?? child.name]
+                menu.addItem(item)
+            }
+        }
+    }
+
+    // MARK: - Actions
+    @objc private func onRefreshDevices() {
+        refreshDevices()
+    }
+
+    @objc private func onSendCommand(_ sender: NSMenuItem) {
+        guard let dict = sender.representedObject as? [String: String],
+              let controller = dict["controller"], let device = dict["device"], let cmd = dict["cmd"] else { return }
+        Task.detached { [weak self] in
+            guard let self = self else { return }
+            let ok = await self.api?.sendCommand(controller: controller, device: device, commandPath: cmd) ?? false
+            DispatchQueue.main.async {
+                if ok {
+                    print("✅ Sent: \(controller)/\(device)/\(cmd)")
+                } else {
+                    print("⚠️ Failed to send: \(controller)/\(device)/\(cmd)")
+                }
+            }
+        }
+    }
+
+    private func refreshDevices() {
+        isLoading = true
+        setupMenu()
+        api = BroadlinkController(host: config.host, port: config.port)
+        Task.detached { [weak self] in
+            guard let self = self, let api = self.api else { return }
+            let ctrls = await api.fetchControllers()
+            var cache: [String: [String: BLNode]] = [:]
+            for c in ctrls {
+                let devs = await api.fetchDevices(controller: c.name)
+                var map: [String: BLNode] = [:]
+                for d in devs {
+                    if let tree = await api.fetchCommandTree(controller: c.name, device: d.name) {
+                        map[d.name] = tree
+                    }
+                }
+                cache[c.name] = map
+            }
+            DispatchQueue.main.async {
+                self.controllers = ctrls
+                self.treeCache = cache
+                self.isLoading = false
+                self.setupMenu()
+            }
+        }
     }
 
     // MARK: - Launch at Startup Toggle
