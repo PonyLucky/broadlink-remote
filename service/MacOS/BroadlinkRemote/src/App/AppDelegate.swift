@@ -7,7 +7,6 @@ import Foundation
 import AppKit
 import SwiftUI
 import Combine
-import MediaPlayer
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -54,8 +53,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // List of devices and their actions
         buildDevicesMenu(into: menu)
-
-        // ---
 
         menu.addItem(.separator())
         addStartupToggle(to: menu)

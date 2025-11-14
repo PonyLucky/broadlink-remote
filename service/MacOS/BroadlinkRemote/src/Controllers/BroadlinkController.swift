@@ -61,7 +61,7 @@ class BroadlinkController {
     }
 
     private func getURL(_ endpoint: String) -> URL? {
-        URL(string: "http://\(host):\(port)\(endpoint)")
+        URL(string: "http://\(host):\(port)/api\(endpoint)")
     }
 
     private func makeRequest(_ endpoint: String, method: String, timeout: TimeInterval = 4.0) async -> (Data?, Int?) {
