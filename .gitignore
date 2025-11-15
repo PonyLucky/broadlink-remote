@@ -1,6 +1,10 @@
 .idea/
-.venv/
 .env
+
+# API
+.venv/
 __pycache__/
+
+# Service
 .DS_Store
 *.xcodeproj/
