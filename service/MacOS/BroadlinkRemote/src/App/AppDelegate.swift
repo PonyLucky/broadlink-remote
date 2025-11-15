@@ -65,7 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func updateStatusIcon() {
         // https://github.com/sam4096/apple-sf-symbols-list/blob/main/allsfsymbols.txt
-        let icon = NSImage(systemSymbolName: "house.circle", accessibilityDescription: nil)
+        let icon = NSImage(systemSymbolName: "av.remote", accessibilityDescription: nil)
         icon?.isTemplate = true
         if let button = statusItem.button {
             button.image = icon
