@@ -97,6 +97,30 @@
                 <send device="amp" command="power"/>
                 <send device="network_player" command="power"/>
             </scriptlet>
+            <scriptlet name="velux_down" frendly-name="Velux DOWN">
+                <send device="velux" command="down"/>
+		<wait time="50"/>
+                <send device="velux" command="down"/>
+		<wait time="50"/>
+                <send device="velux" command="down"/>
+		<wait time="50"/>
+                <send device="velux" command="down"/>
+		<wait time="50"/>
+                <send device="velux" command="down"/>
+		<wait time="50"/>
+            </scriptlet>
+            <scriptlet name="velux_up" frendly-name="Velux UP">
+                <send device="velux" command="up"/>
+		<wait time="50"/>
+                <send device="velux" command="up"/>
+		<wait time="50"/>
+                <send device="velux" command="up"/>
+		<wait time="50"/>
+                <send device="velux" command="up"/>
+		<wait time="50"/>
+                <send device="velux" command="up"/>
+		<wait time="50"/>
+            </scriptlet>
         </scripts>
     </controller>
 </broadlink>
