@@ -29,6 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Run as a true menu bar app: hide from Dock and Cmd+Tab
+        NSApp.setActivationPolicy(.accessory)
+        
         setupMenuBar()
         updateStatusIcon()
         refreshDevices()
