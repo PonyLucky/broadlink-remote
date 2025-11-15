@@ -132,24 +132,39 @@ class BroadlinkController {
     }
 
     private func buildNodes(into parent: BLNode, json: [String: Any], path: String) {
-        // Commands
-        if let commands = json["commands"] as? [String: Any] {
-            for (name, maybeCmd) in commands.sorted(by: { $0.key < $1.key }) {
-                var disabled = false
-                if let dict = maybeCmd as? [String: Any], let dis = dict["disabled"] as? Bool { disabled = dis }
+        // Commands can be either a dict{name: obj} or an array of {name, disabled, ...}
+        if let commandsDict = json["commands"] as? [String: Any] {
+            for (name, maybeCmd) in commandsDict.sorted(by: { $0.key < $1.key }) {
+                let disabled = (maybeCmd as? [String: Any])?["disabled"] as? Bool ?? false
+                let newPath = path.isEmpty ? name : "\(path).\(name)"
+                let node = BLNode(kind: .command, name: name, disabled: disabled, commandPath: newPath)
+                parent.children.append(node)
+            }
+        } else if let commandsArr = json["commands"] as? [[String: Any]] {
+            for cmd in commandsArr {
+                guard let name = cmd["name"] as? String else { continue }
+                let disabled = (cmd["disabled"] as? Bool) ?? false
                 let newPath = path.isEmpty ? name : "\(path).\(name)"
                 let node = BLNode(kind: .command, name: name, disabled: disabled, commandPath: newPath)
                 parent.children.append(node)
             }
         }
-        // Groups
-        if let groups = json["groups"] as? [String: Any] {
-            for (gname, gval) in groups.sorted(by: { $0.key < $1.key }) {
+        // Groups can be either a dict{name: obj} or an array of group dicts
+        if let groupsDict = json["groups"] as? [String: Any] {
+            for (gname, gval) in groupsDict.sorted(by: { $0.key < $1.key }) {
                 let gdict = gval as? [String: Any] ?? [:]
                 let disabled = (gdict["disabled"] as? Bool) ?? false
                 let node = BLNode(kind: .group, name: gname, disabled: disabled)
                 parent.children.append(node)
                 buildNodes(into: node, json: gdict, path: path.isEmpty ? gname : "\(path).\(gname)")
+            }
+        } else if let groupsArr = json["groups"] as? [[String: Any]] {
+            for g in groupsArr {
+                guard let gname = g["name"] as? String else { continue }
+                let disabled = (g["disabled"] as? Bool) ?? false
+                let node = BLNode(kind: .group, name: gname, disabled: disabled)
+                parent.children.append(node)
+                buildNodes(into: node, json: g, path: path.isEmpty ? gname : "\(path).\(gname)")
             }
         }
     }
