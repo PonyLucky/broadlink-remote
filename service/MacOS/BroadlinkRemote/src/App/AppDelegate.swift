@@ -103,7 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         for ctrl in controllers.sorted(by: { ($0.friendly_name ?? $0.name) < ($1.friendly_name ?? $1.name) }) {
             let ctrlItem = NSMenuItem(title: ctrl.friendly_name ?? ctrl.name, action: nil, keyEquivalent: "")
-            let ctrlMenu = NSMenu(title: ctrl.name)
+            let ctrlMenu = NSMenu(title: ctrl.friendly_name ?? ctrl.name)
             // Devices
             let devMap = treeCache[ctrl.name] ?? [:]
             if devMap.isEmpty {
@@ -112,7 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 ctrlMenu.addItem(empty)
             } else {
                 for (devName, rootNode) in devMap.sorted(by: { $0.key < $1.key }) {
-                    let devTitle = devName
+                    let devTitle = rootNode.friendlyName ?? devName
                     let devItem = NSMenuItem(title: devTitle, action: nil, keyEquivalent: "")
                     let devMenu = NSMenu(title: devTitle)
                     let count = buildTreeMenu(into: devMenu, controller: ctrl.name, device: devName, node: rootNode)
@@ -130,14 +130,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @discardableResult
     private func buildTreeMenu(into menu: NSMenu, controller: String, device: String, node: BLNode) -> Int {
         var addedCount = 0
-        for child in node.children.sorted(by: { $0.name < $1.name }) {
+        for child in node.children.sorted(by: { $0.friendlyName ?? $0.name < $1.friendlyName ?? $1.name }) {
             switch child.kind {
             case .group:
                 if !showDisabledItems && child.disabled { continue }
-                let title = showDisabledItems && child.disabled ? child.name + " (disabled)" : child.name
+                let title = showDisabledItems && child.disabled ? child.friendlyName ?? child.name + " (disabled)" : child.friendlyName ?? child.name
                 let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
                 item.isEnabled = !child.disabled
-                let sub = NSMenu(title: child.name)
+                let sub = NSMenu(title: child.friendlyName ?? child.name)
                 let subCount = buildTreeMenu(into: sub, controller: controller, device: device, node: child)
                 // When hiding disabled, avoid empty groups
                 if showDisabledItems || subCount > 0 {
@@ -147,7 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             case .command:
                 if !showDisabledItems && child.disabled { continue }
-                let title = showDisabledItems && child.disabled ? child.name + " (disabled)" : child.name
+                let title = showDisabledItems && child.disabled ? child.friendlyName ?? child.name + " (disabled)" : child.friendlyName ?? child.name
                 let item = NSMenuItem(title: title, action: #selector(onSendCommand(_:)), keyEquivalent: "")
                 item.isEnabled = !child.disabled
                 item.representedObject = ["controller": controller, "device": device, "cmd": child.commandPath ?? child.name]

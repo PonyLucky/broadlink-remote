@@ -29,14 +29,16 @@ class BLNode: NSObject {
     enum Kind { case group, command }
     let kind: Kind
     let name: String
+    let friendlyName: String?
     let disabled: Bool
     var children: [BLNode] = []
     // For commands we hold the path (dot-separated)
     let commandPath: String?
 
-    init(kind: Kind, name: String, disabled: Bool = false, commandPath: String? = nil, children: [BLNode] = []) {
+    init(kind: Kind, name: String, friendlyName: String? = nil, disabled: Bool = false, commandPath: String? = nil, children: [BLNode] = []) {
         self.kind = kind
         self.name = name
+        self.friendlyName = friendlyName
         self.disabled = disabled
         self.commandPath = commandPath
         self.children = children
@@ -122,7 +124,8 @@ class BroadlinkController {
         do {
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             // Expect a dict with optional 'groups' and 'commands'
-            let root = BLNode(kind: .group, name: device)
+            let rootFriendly = (json?["friendly_name"] as? String)
+            let root = BLNode(kind: .group, name: device, friendlyName: rootFriendly)
             buildNodes(into: root, json: json ?? [:], path: "")
             return root
         } catch {
@@ -135,17 +138,20 @@ class BroadlinkController {
         // Commands can be either a dict{name: obj} or an array of {name, disabled, ...}
         if let commandsDict = json["commands"] as? [String: Any] {
             for (name, maybeCmd) in commandsDict.sorted(by: { $0.key < $1.key }) {
-                let disabled = (maybeCmd as? [String: Any])?["disabled"] as? Bool ?? false
+                let cdict = (maybeCmd as? [String: Any]) ?? [:]
+                let disabled = cdict["disabled"] as? Bool ?? false
+                let friendly = cdict["friendly_name"] as? String
                 let newPath = path.isEmpty ? name : "\(path).\(name)"
-                let node = BLNode(kind: .command, name: name, disabled: disabled, commandPath: newPath)
+                let node = BLNode(kind: .command, name: name, friendlyName: friendly, disabled: disabled, commandPath: newPath)
                 parent.children.append(node)
             }
         } else if let commandsArr = json["commands"] as? [[String: Any]] {
             for cmd in commandsArr {
                 guard let name = cmd["name"] as? String else { continue }
                 let disabled = (cmd["disabled"] as? Bool) ?? false
+                let friendly = cmd["friendly_name"] as? String
                 let newPath = path.isEmpty ? name : "\(path).\(name)"
-                let node = BLNode(kind: .command, name: name, disabled: disabled, commandPath: newPath)
+                let node = BLNode(kind: .command, name: name, friendlyName: friendly, disabled: disabled, commandPath: newPath)
                 parent.children.append(node)
             }
         }
@@ -154,7 +160,8 @@ class BroadlinkController {
             for (gname, gval) in groupsDict.sorted(by: { $0.key < $1.key }) {
                 let gdict = gval as? [String: Any] ?? [:]
                 let disabled = (gdict["disabled"] as? Bool) ?? false
-                let node = BLNode(kind: .group, name: gname, disabled: disabled)
+                let friendly = gdict["friendly_name"] as? String
+                let node = BLNode(kind: .group, name: gname, friendlyName: friendly, disabled: disabled)
                 parent.children.append(node)
                 buildNodes(into: node, json: gdict, path: path.isEmpty ? gname : "\(path).\(gname)")
             }
@@ -162,7 +169,8 @@ class BroadlinkController {
             for g in groupsArr {
                 guard let gname = g["name"] as? String else { continue }
                 let disabled = (g["disabled"] as? Bool) ?? false
-                let node = BLNode(kind: .group, name: gname, disabled: disabled)
+                let friendly = g["friendly_name"] as? String
+                let node = BLNode(kind: .group, name: gname, friendlyName: friendly, disabled: disabled)
                 parent.children.append(node)
                 buildNodes(into: node, json: g, path: path.isEmpty ? gname : "\(path).\(gname)")
             }
