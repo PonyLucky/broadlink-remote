@@ -61,6 +61,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         refreshItem.isEnabled = !isLoading
         menu.addItem(refreshItem)
 
+        // Open web UI
+        let openWebItem = NSMenuItem(title: "Open Web App", action: #selector(onOpenWebApp), keyEquivalent: "o")
+        menu.addItem(openWebItem)
+
         // List of devices and their actions
         buildDevicesMenu(into: menu)
 
@@ -180,6 +184,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
         }
+    }
+
+    @objc private func onOpenWebApp() {
+        // Build http://host:port/ and open with the default browser (Firefox if set as default)
+        var comps = URLComponents()
+        comps.scheme = "http"
+        comps.host = config.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        comps.port = config.port
+        comps.path = "/"
+        guard let url = comps.url else {
+            print("⚠️ Invalid host/port: \(config.host):\(config.port)")
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 
     private func refreshDevices() {
