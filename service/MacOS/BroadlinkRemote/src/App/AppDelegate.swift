@@ -21,6 +21,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var controllers: [BLControllerInfo] = []
     private var isLoading: Bool = false
 
+    // Preferences
+    private let showDisabledItemsKey = "ShowDisabledItems"
+    private var showDisabledItems: Bool {
+        get { UserDefaults.standard.object(forKey: showDisabledItemsKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: showDisabledItemsKey) }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
         updateStatusIcon()
@@ -55,6 +62,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         buildDevicesMenu(into: menu)
 
         menu.addItem(.separator())
+        // Show/Hide disabled items toggle (checkbox)
+        addShowDisabledToggle(to: menu)
+        // Startup toggle
         addStartupToggle(to: menu)
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quitter", action: #selector(quitApp), keyEquivalent: "q")
@@ -105,9 +115,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     let devTitle = devName
                     let devItem = NSMenuItem(title: devTitle, action: nil, keyEquivalent: "")
                     let devMenu = NSMenu(title: devTitle)
-                    buildTreeMenu(into: devMenu, controller: ctrl.name, device: devName, node: rootNode)
-                    devItem.submenu = devMenu
-                    ctrlMenu.addItem(devItem)
+                    let count = buildTreeMenu(into: devMenu, controller: ctrl.name, device: devName, node: rootNode)
+                    if showDisabledItems || count > 0 {
+                        devItem.submenu = devMenu
+                        ctrlMenu.addItem(devItem)
+                    }
                 }
             }
             ctrlItem.submenu = ctrlMenu
@@ -115,23 +127,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-    private func buildTreeMenu(into menu: NSMenu, controller: String, device: String, node: BLNode) {
+    @discardableResult
+    private func buildTreeMenu(into menu: NSMenu, controller: String, device: String, node: BLNode) -> Int {
+        var addedCount = 0
         for child in node.children.sorted(by: { $0.name < $1.name }) {
             switch child.kind {
             case .group:
-                let item = NSMenuItem(title: child.name + (child.disabled ? " (disabled)" : ""), action: nil, keyEquivalent: "")
+                if !showDisabledItems && child.disabled { continue }
+                let title = showDisabledItems && child.disabled ? child.name + " (disabled)" : child.name
+                let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
                 item.isEnabled = !child.disabled
                 let sub = NSMenu(title: child.name)
-                buildTreeMenu(into: sub, controller: controller, device: device, node: child)
-                item.submenu = sub
-                menu.addItem(item)
+                let subCount = buildTreeMenu(into: sub, controller: controller, device: device, node: child)
+                // When hiding disabled, avoid empty groups
+                if showDisabledItems || subCount > 0 {
+                    item.submenu = sub
+                    menu.addItem(item)
+                    addedCount += 1
+                }
             case .command:
-                let item = NSMenuItem(title: child.name + (child.disabled ? " (disabled)" : ""), action: #selector(onSendCommand(_:)), keyEquivalent: "")
+                if !showDisabledItems && child.disabled { continue }
+                let title = showDisabledItems && child.disabled ? child.name + " (disabled)" : child.name
+                let item = NSMenuItem(title: title, action: #selector(onSendCommand(_:)), keyEquivalent: "")
                 item.isEnabled = !child.disabled
                 item.representedObject = ["controller": controller, "device": device, "cmd": child.commandPath ?? child.name]
                 menu.addItem(item)
+                addedCount += 1
             }
         }
+        return addedCount
     }
 
     // MARK: - Actions
@@ -180,6 +204,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self.setupMenu()
             }
         }
+    }
+
+    // MARK: - Disabled Items Toggle
+    private func addShowDisabledToggle(to menu: NSMenu) {
+        let item = NSMenuItem()
+        item.title = "Show disabled commands/groups"
+        item.state = showDisabledItems ? .on : .off
+        item.action = #selector(toggleShowDisabled)
+        item.target = self
+        menu.addItem(item)
+    }
+
+    @objc private func toggleShowDisabled() {
+        showDisabledItems.toggle()
+        setupMenu()
     }
 
     // MARK: - Launch at Startup Toggle
