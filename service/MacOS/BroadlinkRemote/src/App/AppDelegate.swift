@@ -61,18 +61,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         refreshItem.isEnabled = !isLoading
         menu.addItem(refreshItem)
 
+        // List of devices and their actions
+        buildDevicesMenu(into: menu)
+        menu.addItem(.separator())
+        
         // Open web UI
         let openWebItem = NSMenuItem(title: "Open Web App", action: #selector(onOpenWebApp), keyEquivalent: "o")
         menu.addItem(openWebItem)
 
-        // List of devices and their actions
-        buildDevicesMenu(into: menu)
+        let settingsMenu = NSMenu(title: "Settings")
+        let settingsTitle = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+        settingsTitle.submenu = settingsMenu
+        addShowDisabledToggle(to: settingsMenu)
+        addStartupToggle(to: settingsMenu)
+        menu.addItem(settingsTitle)
 
-        menu.addItem(.separator())
-        // Show/Hide disabled items toggle (checkbox)
-        addShowDisabledToggle(to: menu)
-        // Startup toggle
-        addStartupToggle(to: menu)
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quitter", action: #selector(quitApp), keyEquivalent: "q")
 
