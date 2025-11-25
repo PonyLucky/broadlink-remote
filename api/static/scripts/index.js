@@ -18,6 +18,11 @@ const commandsPanel = $('#commandsPanel');
 const commandsView = $('#commandsView');
 const viewContainer = $('#viewContainer');
 
+// Theme toggle elements
+const themeDarkBtn = $('#themeDarkBtn');
+const themeLightBtn = $('#themeLightBtn');
+const themeContrastBtn = $('#themeContrastBtn');
+
 // Modal elements
 const filtersBtn = $('#filtersBtn');
 const filtersOverlay = $('#filtersOverlay');
@@ -34,12 +39,14 @@ const scriptRunBtn = $('#scriptRunBtn');
 
 const API_PATH = '/api';
 
+
 // LocalStorage keys and helpers
 const LS_KEYS = {
   view: 'blr.viewMode',
   showDisabled: 'blr.showDisabled',
   controller: 'blr.controller',
   devicesByController: 'blr.devicesByController',
+  theme: 'blr.theme',
 };
 function lsGet(key, def = null) {
   try {
@@ -62,6 +69,28 @@ function lsGetJSON(key, def = {}) {
 function lsSetJSON(key, obj) {
   try { localStorage.setItem(key, JSON.stringify(obj)); } catch (_) {}
 }
+
+// Theme management
+const THEMES = ['theme-dark', 'theme-white', 'theme-contrast'];
+function applyTheme(theme) {
+  const body = document.body;
+  const t = THEMES.includes(theme) ? theme : 'theme-white';
+  THEMES.forEach(cls => body.classList.toggle(cls, cls === t));
+  lsSet(LS_KEYS.theme, t);
+  const map = {
+    'theme-dark': themeDarkBtn,
+    'theme-white': themeLightBtn,
+    'theme-contrast': themeContrastBtn,
+  };
+  Object.entries(map).forEach(([name, btn]) => {
+    if (!btn) return;
+    const isActive = name === t;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+}
+// Initialize theme from saved value (default: white)
+applyTheme(lsGet(LS_KEYS.theme, 'theme-white'));
 
 let allDevices = [];
 let selectedDevices = new Set();
@@ -841,6 +870,11 @@ function updateFancyView() {
 // Bind view buttons
 viewFancyBtn?.addEventListener('click', () => setActiveView('fancy'));
 viewListBtn?.addEventListener('click', () => setActiveView('list'));
+
+// Bind theme buttons
+themeDarkBtn?.addEventListener('click', () => applyTheme('theme-dark'));
+themeLightBtn?.addEventListener('click', () => applyTheme('theme-white'));
+themeContrastBtn?.addEventListener('click', () => applyTheme('theme-contrast'));
 
 // Keep fancy view in sync with selection changes
 controllerSel.addEventListener('change', () => { if (isFancyActive()) updateFancyView(); });
