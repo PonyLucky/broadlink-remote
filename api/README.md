@@ -39,14 +39,16 @@ Once running:
 
 You can run the API and static UI in a container using the provided `Dockerfile`.
 
-Build the image:
+### Build the image:
 
 ```
 # From this directory
 docker build -t broadlinkremote-api .
+# Or, for ARM64:
+docker build --platform linux/amd64 -t ponylucky/broadlinkremote-api .
 ```
 
-Run the container (exposing port 5000 and mounting your XML config read-only):
+### Run the container (exposing port 5000 and mounting your XML config read-only):
 
 ```
 docker run --rm -p 5000:5000 \
@@ -56,7 +58,14 @@ docker run --rm -p 5000:5000 \
   --name broadlink-api broadlinkremote-api
 ```
 
-Notes:
+### To push the image to a registry:
+```
+docker build --platform linux/amd64 -t ponylucky/broadlinkremote-api .
+docker tab ponylucky/broadlinkremote-api ponylucky/broadlinkremote-api:latest
+docker push ponylucky/broadlinkremote-api:latest
+```
+
+### Notes:
 - Networking: Default bridge networking works for most setups. If your Broadlink device is only reachable on the host network (especially on Linux), you can use host networking:
   - Linux: `docker run --rm --network host broadlinkremote-api`
 - Configuration: The app reads `broadlink.xml` from `/app/broadlink.xml`. Mount your local file into the container as shown above.
