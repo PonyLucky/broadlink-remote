@@ -26,14 +26,14 @@ python main.py
 
 Environment variables (optional):
 - `FLASK_HOST` (default: `0.0.0.0`)
-- `FLASK_PORT` (default: `5000`)
+- `FLASK_PORT` (default: `6676`)
 - `FLASK_DEBUG` (`true`/`false`, default: `false`)
 - `FLASK_ENV` (set to `development` to always reload XML on each request)
 
 Once running:
-- UI: http://localhost:5000/
-- Static files: http://localhost:5000/static/
-- OpenAPI: http://localhost:5000/api/doc/openapi.json
+- UI: http://localhost:6676/
+- Static files: http://localhost:6676/static/
+- OpenAPI: http://localhost:6676/api/doc/openapi.json
 
 ## Docker
 
@@ -48,10 +48,10 @@ docker build -t broadlinkremote-api .
 docker build --platform linux/amd64 -t ponylucky/broadlinkremote-api .
 ```
 
-### Run the container (exposing port 5000 and mounting your XML config read-only):
+### Run the container (exposing port 6676 and mounting your XML config read-only):
 
 ```
-docker run --rm -p 5000:5000 \
+docker run --rm -p 6676:6676 \
   -e FLASK_DEBUG=false \
   -e FLASK_ENV=production \
   -v "$PWD/broadlink.xml":/app/broadlink.xml:ro \
@@ -69,10 +69,10 @@ docker push ponylucky/broadlinkremote-api:latest
 - Networking: Default bridge networking works for most setups. If your Broadlink device is only reachable on the host network (especially on Linux), you can use host networking:
   - Linux: `docker run --rm --network host broadlinkremote-api`
 - Configuration: The app reads `broadlink.xml` from `/app/broadlink.xml`. Mount your local file into the container as shown above.
-- Ports: The container listens on `0.0.0.0:5000` by default. Change the published port if needed, e.g. `-p 8080:5000`.
+- Ports: The container listens on `0.0.0.0:6676` by default. Change the published port if needed, e.g. `-p 8080:6676`.
 - Environment variables:
   - `FLASK_HOST` (default: `0.0.0.0`)
-  - `FLASK_PORT` (default: `5000`)
+  - `FLASK_PORT` (default: `6676`)
   - `FLASK_DEBUG` (`true`/`false`, default: `false`)
   - `FLASK_ENV` (set to `development` to always reload XML on each request)
 - Deterministic installs: If you add a `requirements.txt` later, consider updating the `Dockerfile` to copy it first and run `pip install -r requirements.txt` for better layer caching.
@@ -94,16 +94,16 @@ Example usages:
 
 ```
 # List controllers
-curl http://localhost:5000/api/controller
+curl http://localhost:6676/api/controller
 
 # List devices under controller named "bedroom"
-curl http://localhost:5000/api/bedroom/device
+curl http://localhost:6676/api/bedroom/device
 
 # List commands for device "tv"
-curl http://localhost:5000/api/bedroom/tv
+curl http://localhost:6676/api/bedroom/tv
 
 # Send a command to turn the TV on (example: command path "power.on")
-curl -X POST http://localhost:5000/api/bedroom/tv/power.on
+curl -X POST http://localhost:6676/api/bedroom/tv/power.on
 ```
 
 Responses are JSON. Error responses use proper HTTP status codes with a short description.
@@ -142,17 +142,17 @@ Example:
 Run this scriptlet with:
 
 ```
-curl -X POST http://localhost:5000/api/bedroom/scripts/music
+curl -X POST http://localhost:6676/api/bedroom/scripts/music
 ```
 
 Inspect scripts:
 
 ```
 # List scripts for a controller
-curl http://localhost:5000/api/bedroom/scripts
+curl http://localhost:6676/api/bedroom/scripts
 
 # Show a scriptlet's content
-curl http://localhost:5000/api/bedroom/scripts/music
+curl http://localhost:6676/api/bedroom/scripts/music
 ```
 
 ## Tools
