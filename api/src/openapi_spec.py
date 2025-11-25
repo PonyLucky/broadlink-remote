@@ -9,20 +9,20 @@ def build_openapi() -> Dict[str, Any]:
             'version': '1.0.0'
         },
         'paths': {
-            '/doc/openapi.json': {
+            '/api/doc/openapi.json': {
                 'get': {'summary': 'Get OpenAPI document', 'responses': {'200': {'description': 'OK'}}}
             },
-            '/controller': {
+            '/api/controller': {
                 'get': {'summary': 'List controllers', 'responses': {'200': {'description': 'OK'}}}
             },
-            '/{c_name}/device': {
+            '/api/{c_name}/device': {
                 'get': {
                     'summary': 'List devices of a controller',
                     'parameters': [{'name': 'c_name', 'in': 'path', 'required': True, 'schema': {'type': 'string'}}],
                     'responses': {'200': {'description': 'OK'}, '404': {'description': 'Not found'}}
                 }
             },
-            '/{c_name}/{d_name}': {
+            '/api/{c_name}/{d_name}': {
                 'get': {
                     'summary': 'List commands and groups for a device',
                     'parameters': [
@@ -32,7 +32,7 @@ def build_openapi() -> Dict[str, Any]:
                     'responses': {'200': {'description': 'OK'}, '404': {'description': 'Not found'}}
                 }
             },
-            '/{c_name}/{d_name}/{cmd_name}': {
+            '/api/{c_name}/{d_name}/{cmd_name}': {
                 'post': {
                     'summary': 'Send a command to a device',
                     'parameters': [
@@ -49,7 +49,7 @@ def build_openapi() -> Dict[str, Any]:
                     }
                 }
             },
-            '/{c_name}/scripts': {
+            '/api/{c_name}/scripts': {
                 'get': {
                     'summary': 'List scripts for a controller',
                     'parameters': [
@@ -58,7 +58,7 @@ def build_openapi() -> Dict[str, Any]:
                     'responses': {'200': {'description': 'OK'}, '404': {'description': 'Not found'}}
                 }
             },
-            '/{c_name}/scripts/{s_name}': {
+            '/api/{c_name}/scripts/{s_name}': {
                 'get': {
                     'summary': 'Show content of a scriptlet',
                     'parameters': [
