@@ -24,6 +24,20 @@ struct BLDeviceInfo: Decodable {
     let model: String?
 }
 
+// MARK: - Scripts
+struct BLScriptStep: Decodable {
+    let type: String
+    let device: String?
+    let command: String?
+    let time: Int?
+}
+
+struct BLScript: Decodable {
+    let name: String
+    let friendly_name: String?
+    let steps: [BLScriptStep]?
+}
+
 // Generic node for commands/groups tree
 class BLNode: NSObject {
     enum Kind { case group, command }
@@ -115,6 +129,23 @@ class BroadlinkController {
             print("⚠️ decode devices: \(error)")
             return []
         }
+    }
+
+    // Scripts
+    func fetchScripts(controller: String) async -> [BLScript] {
+        let (data, status) = await makeRequest("/\(controller)/scripts", method: "GET")
+        guard status == 200, let data = data else { return [] }
+        do {
+            return try JSONDecoder().decode([BLScript].self, from: data)
+        } catch {
+            print("⚠️ decode scripts: \(error)")
+            return []
+        }
+    }
+
+    func runScript(controller: String, name: String) async -> Bool {
+        let (_, status) = await makeRequest("/\(controller)/scripts/\(name)", method: "POST")
+        return status == 200
     }
 
     // Parse command tree response which is a nested map of groups/commands

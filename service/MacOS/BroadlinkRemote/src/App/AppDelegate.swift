@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var api: BroadlinkController?
     // controller -> device -> tree
     private var treeCache: [String: [String: BLNode]] = [:]
+    // controller -> scripts
+    private var scriptsCache: [String: [BLScript]] = [:]
     private var controllers: [BLControllerInfo] = []
     private var isLoading: Bool = false
 
@@ -114,6 +116,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         for ctrl in controllers.sorted(by: { ($0.friendly_name ?? $0.name) < ($1.friendly_name ?? $1.name) }) {
             let ctrlItem = NSMenuItem(title: ctrl.friendly_name ?? ctrl.name, action: nil, keyEquivalent: "")
             let ctrlMenu = NSMenu(title: ctrl.friendly_name ?? ctrl.name)
+            // Scripts
+            let scripts = scriptsCache[ctrl.name] ?? []
+            if scripts.isEmpty {
+                let emptyScripts = NSMenuItem(title: "No scripts", action: nil, keyEquivalent: "")
+                emptyScripts.isEnabled = false
+                ctrlMenu.addItem(emptyScripts)
+            } else {
+                let scriptsItem = NSMenuItem(title: "Scripts", action: nil, keyEquivalent: "")
+                let scriptsMenu = NSMenu(title: "Scripts")
+                for s in scripts.sorted(by: { ($0.friendly_name ?? $0.name) < ($1.friendly_name ?? $1.name) }) {
+                    let title = s.friendly_name ?? s.name
+                    let it = NSMenuItem(title: title, action: #selector(onRunScript(_:)), keyEquivalent: "")
+                    it.representedObject = ["controller": ctrl.name, "script": s.name]
+                    scriptsMenu.addItem(it)
+                }
+                scriptsItem.submenu = scriptsMenu
+                ctrlMenu.addItem(scriptsItem)
+            }
+            ctrlMenu.addItem(.separator())
             // Devices
             let devMap = treeCache[ctrl.name] ?? [:]
             if devMap.isEmpty {
@@ -203,6 +224,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSWorkspace.shared.open(url)
     }
 
+    @objc private func onRunScript(_ sender: NSMenuItem) {
+        guard let dict = sender.representedObject as? [String: String],
+              let controller = dict["controller"], let script = dict["script"] else { return }
+        Task.detached { [weak self] in
+            guard let self = self else { return }
+            let ok = await self.api?.runScript(controller: controller, name: script) ?? false
+            DispatchQueue.main.async {
+                if ok {
+                    print("✅ Script: \(controller)/\(script) ran successfully")
+                } else {
+                    print("⚠️ Failed to run script: \(controller)/\(script)")
+                }
+            }
+        }
+    }
+
     private func refreshDevices() {
         isLoading = true
         setupMenu()
@@ -211,7 +248,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             guard let self = self, let api = self.api else { return }
             let ctrls = await api.fetchControllers()
             var cache: [String: [String: BLNode]] = [:]
+            var scriptsCacheLocal: [String: [BLScript]] = [:]
             for c in ctrls {
+                // Fetch scripts for this controller
+                let scripts = await api.fetchScripts(controller: c.name)
+                scriptsCacheLocal[c.name] = scripts
+                // Fetch devices and their command trees
                 let devs = await api.fetchDevices(controller: c.name)
                 var map: [String: BLNode] = [:]
                 for d in devs {
@@ -224,6 +266,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             DispatchQueue.main.async {
                 self.controllers = ctrls
                 self.treeCache = cache
+                self.scriptsCache = scriptsCacheLocal
                 self.isLoading = false
                 self.setupMenu()
             }
