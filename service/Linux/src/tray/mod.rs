@@ -7,11 +7,15 @@ use tokio::runtime::Handle;
 
 pub struct BroadlinkTray {
     state: Arc<AppState>,
+    handle: Handle,
 }
 
 impl BroadlinkTray {
     pub fn new(state: Arc<AppState>) -> Self {
-        Self { state }
+        Self {
+            state,
+            handle: Handle::current(),
+        }
     }
 
     fn build_node_menu(&self, node: &BLNode, controller: &str, device: &str) -> MenuItem<Self> {
@@ -34,18 +38,20 @@ impl BroadlinkTray {
                 let device = device.to_string();
                 let cmd_path = node.command_path.clone().unwrap_or_default();
                 let state = self.state.clone();
+                let handle = self.handle.clone();
                 
                 MenuItem::Standard(StandardItem {
                     label: title,
                     enabled: !node.disabled,
                     activate: Box::new(move |_| {
                         let state = state.clone();
+                        let handle = handle.clone();
                         let controller = controller.clone();
                         let device = device.clone();
                         let cmd_path = cmd_path.clone();
                         
                         // Execute async task from sync callback
-                        Handle::current().spawn(async move {
+                        handle.spawn(async move {
                             match state.client.send_command(&controller, &device, &cmd_path).await {
                                 Ok(true) => log::info!("✅ Sent: {}/{}/{}", controller, device, cmd_path),
                                 Ok(false) => log::warn!("⚠️ Failed to send: {}/{}/{}", controller, device, cmd_path),
@@ -69,11 +75,13 @@ impl Tray for BroadlinkTray {
         let mut items = Vec::new();
 
         let state = self.state.clone();
+        let handle = self.handle.clone();
         items.push(MenuItem::Standard(StandardItem {
             label: "Refresh devices".to_string(),
             activate: Box::new(move |_| {
                 let state = state.clone();
-                Handle::current().spawn(async move {
+                let handle = handle.clone();
+                handle.spawn(async move {
                     state.refresh_devices().await;
                 });
             }),
@@ -97,13 +105,15 @@ impl Tray for BroadlinkTray {
                     let controller = ctrl.name.clone();
                     let script_name = script.name.clone();
                     let state = self.state.clone();
+                    let handle = self.handle.clone();
                     script_items.push(MenuItem::Standard(StandardItem {
                         label: script.friendly_name.clone().unwrap_or_else(|| script.name.clone()),
                         activate: Box::new(move |_| {
                             let state = state.clone();
+                            let handle = handle.clone();
                             let controller = controller.clone();
                             let script_name = script_name.clone();
-                            Handle::current().spawn(async move {
+                            handle.spawn(async move {
                                 if let Ok(true) = state.client.run_script(&controller, &script_name).await {
                                     log::info!("✅ Script: {}/{} ran successfully", controller, script_name);
                                 }
