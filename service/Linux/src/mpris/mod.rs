@@ -1,16 +1,50 @@
 use mpris_server::{
-    Metadata, PlayerInterface, RootInterface, PlaybackStatus, LoopStatus, Time, Property, TrackId
+    Metadata, PlayerInterface, RootInterface, PlaybackStatus, LoopStatus, Time, TrackId
 };
 use crate::state::AppState;
+use crate::config::MprisCommands;
 use std::sync::Arc;
+use tokio::runtime::Handle;
 
 pub struct BroadlinkPlayer {
     state: Arc<AppState>,
+    handle: Handle,
 }
 
 impl BroadlinkPlayer {
     pub fn new(state: Arc<AppState>) -> Self {
-        Self { state }
+        Self { 
+            state,
+            handle: Handle::current(),
+        }
+    }
+
+    async fn send_mpris_command(&self, get_cmd: impl FnOnce(&MprisCommands) -> &String) -> Result<(), zbus::fdo::Error> {
+        let config = self.state.mpris_config.read().await;
+        if !config.enable || config.controller.is_empty() || config.device.is_empty() {
+            return Ok(());
+        }
+
+        let path = get_cmd(&config.commands).to_string();
+        if path.is_empty() {
+            return Ok(());
+        }
+
+        let controller = config.controller.clone();
+        let device = config.device.clone();
+        let state = self.state.clone();
+        
+        // Spawn on Tokio runtime to ensure reactor is available
+        self.handle.spawn(async move {
+            let actual_path = state.find_command(&controller, &device, &path).await.unwrap_or_else(|| path.clone());
+            match state.client.send_command(&controller, &device, &actual_path).await {
+                Ok(true) => log::info!("MPRIS: Sent {} to {}/{}", actual_path, controller, device),
+                Ok(false) => log::warn!("MPRIS: Failed to send {} to {}/{}", actual_path, controller, device),
+                Err(e) => log::error!("MPRIS: Error sending command: {}", e),
+            }
+        });
+
+        Ok(())
     }
 }
 
@@ -38,22 +72,22 @@ impl RootInterface for BroadlinkPlayer {
 impl PlayerInterface for BroadlinkPlayer {
     async fn next(&self) -> Result<(), zbus::fdo::Error> {
         log::info!("MPRIS: Next");
-        Ok(())
+        self.send_mpris_command(|c| &c.next).await
     }
 
     async fn previous(&self) -> Result<(), zbus::fdo::Error> {
         log::info!("MPRIS: Previous");
-        Ok(())
+        self.send_mpris_command(|c| &c.previous).await
     }
 
     async fn pause(&self) -> Result<(), zbus::fdo::Error> {
         log::info!("MPRIS: Pause");
-        Ok(())
+        self.send_mpris_command(|c| &c.play_pause).await
     }
 
     async fn play_pause(&self) -> Result<(), zbus::fdo::Error> {
         log::info!("MPRIS: PlayPause");
-        Ok(())
+        self.send_mpris_command(|c| &c.play_pause).await
     }
 
     async fn stop(&self) -> Result<(), zbus::fdo::Error> {
@@ -63,7 +97,7 @@ impl PlayerInterface for BroadlinkPlayer {
 
     async fn play(&self) -> Result<(), zbus::fdo::Error> {
         log::info!("MPRIS: Play");
-        Ok(())
+        self.send_mpris_command(|c| &c.play_pause).await
     }
 
     async fn seek(&self, _offset: Time) -> Result<(), zbus::fdo::Error> {
@@ -131,19 +165,23 @@ impl PlayerInterface for BroadlinkPlayer {
     }
 
     async fn can_go_next(&self) -> Result<bool, zbus::fdo::Error> {
-        Ok(true)
+        let config = self.state.mpris_config.read().await;
+        Ok(config.enable && !config.controller.is_empty() && !config.device.is_empty() && !config.commands.next.is_empty())
     }
 
     async fn can_go_previous(&self) -> Result<bool, zbus::fdo::Error> {
-        Ok(true)
+        let config = self.state.mpris_config.read().await;
+        Ok(config.enable && !config.controller.is_empty() && !config.device.is_empty() && !config.commands.previous.is_empty())
     }
 
     async fn can_play(&self) -> Result<bool, zbus::fdo::Error> {
-        Ok(true)
+        let config = self.state.mpris_config.read().await;
+        Ok(config.enable && !config.controller.is_empty() && !config.device.is_empty() && !config.commands.play_pause.is_empty())
     }
 
     async fn can_pause(&self) -> Result<bool, zbus::fdo::Error> {
-        Ok(true)
+        let config = self.state.mpris_config.read().await;
+        Ok(config.enable && !config.controller.is_empty() && !config.device.is_empty() && !config.commands.play_pause.is_empty())
     }
 
     async fn can_seek(&self) -> Result<bool, zbus::fdo::Error> {
@@ -151,27 +189,11 @@ impl PlayerInterface for BroadlinkPlayer {
     }
 
     async fn can_control(&self) -> Result<bool, zbus::fdo::Error> {
-        Ok(true)
+        let config = self.state.mpris_config.read().await;
+        Ok(config.enable && !config.controller.is_empty() && !config.device.is_empty())
     }
 }
 
-pub struct PlayerController {
-    server: mpris_server::Server<BroadlinkPlayer>,
-}
-
-impl PlayerController {
-    pub async fn update_metadata(&self, title: &str, artist: &str) -> zbus::Result<()> {
-        let mut metadata = Metadata::new();
-        metadata.set_title(Some(title.to_string()));
-        metadata.set_artist(Some(vec![artist.to_string()]));
-        
-        self.server.properties_changed(vec![Property::Metadata(metadata)]).await
-    }
-
-    pub async fn set_playback_status(&self, status: PlaybackStatus) -> zbus::Result<()> {
-        self.server.properties_changed(vec![Property::PlaybackStatus(status)]).await
-    }
-}
 
 pub async fn run_mpris(state: Arc<AppState>) -> zbus::Result<()> {
     let player = BroadlinkPlayer::new(state);

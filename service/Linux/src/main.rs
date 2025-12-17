@@ -2,10 +2,12 @@ mod api_client;
 mod mpris;
 mod tray;
 mod state;
+mod config;
 
 use std::sync::{Arc, Mutex};
 use crate::state::AppState;
 use crate::tray::BroadlinkTray;
+use crate::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,15 +16,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     log::info!("Starting Broadlink Remote Linux Port");
 
-    // Load configuration (in a real app, from a file or env)
-    let host = std::env::var("BROADLINK_HOST").unwrap_or_else(|_| "192.168.1.143".to_string());
-    let port = std::env::var("BROADLINK_PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(6676);
+    // Load configuration
+    let config = Config::load()?;
 
     // Initialize state
-    let state = Arc::new(AppState::new(host, port));
+    let state = Arc::new(AppState::new(config));
 
     // Start MPRIS server
     let mpris_state = state.clone();

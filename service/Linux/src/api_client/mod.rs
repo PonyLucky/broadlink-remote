@@ -70,6 +70,14 @@ impl BroadlinkClient {
         Self { host, port, client }
     }
 
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
+    pub fn port(&self) -> u16 {
+        self.port
+    }
+
     fn get_url(&self, endpoint: &str) -> String {
         format!("http://{}:{}/api{}", self.host, self.port, endpoint)
     }
@@ -106,7 +114,8 @@ impl BroadlinkClient {
     }
 
     pub async fn send_command(&self, controller: &str, device: &str, command_path: &str) -> Result<bool, reqwest::Error> {
-        let resp = self.client.post(self.get_url(&format!("/{}/{}/{}", controller, device, command_path)))
+        let normalized_path = command_path.replace(',', ".").replace('/', ".");
+        let resp = self.client.post(self.get_url(&format!("/{}/{}/{}", controller, device, normalized_path)))
             .send()
             .await?;
         Ok(resp.status().is_success())
