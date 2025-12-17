@@ -3,7 +3,7 @@ mod mpris;
 mod tray;
 mod state;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use crate::state::AppState;
 use crate::tray::BroadlinkTray;
 
@@ -24,13 +24,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize state
     let state = Arc::new(AppState::new(host, port));
 
-    // Initial refresh
-    let initial_state = state.clone();
-    tokio::spawn(async move {
-        initial_state.refresh_devices().await;
-        log::info!("Initial device refresh complete");
-    });
-
     // Start MPRIS server
     let mpris_state = state.clone();
     tokio::spawn(async move {
@@ -40,9 +33,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Start System Tray
-    let tray = BroadlinkTray::new(state.clone());
+    let tray_handle_store = Arc::new(Mutex::new(None));
+    let tray = BroadlinkTray::new(state.clone(), tray_handle_store.clone());
     let tray_service = ksni::TrayService::new(tray);
+    let tray_handle = tray_service.handle();
+    
+    {
+        let mut store = tray_handle_store.lock().unwrap();
+        *store = Some(tray_handle.clone());
+    }
+    
     tray_service.spawn();
+
+    // Initial refresh
+    let initial_state = state.clone();
+    let initial_tray_handle = tray_handle.clone();
+    tokio::spawn(async move {
+        initial_state.refresh_devices().await;
+        log::info!("Initial device refresh complete");
+        initial_tray_handle.update(|_| {});
+    });
 
     log::info!("Broadlink Remote is running");
 

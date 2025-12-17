@@ -1,20 +1,22 @@
-use ksni::Tray;
+use ksni::{Tray, Handle as KsniHandle};
 use ksni::menu::{MenuItem, StandardItem, SubMenu};
 use crate::state::AppState;
 use crate::api_client::{BLNode, BLNodeKind};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
 
 pub struct BroadlinkTray {
     state: Arc<AppState>,
     handle: Handle,
+    tray_handle: Arc<Mutex<Option<KsniHandle<BroadlinkTray>>>>,
 }
 
 impl BroadlinkTray {
-    pub fn new(state: Arc<AppState>) -> Self {
+    pub fn new(state: Arc<AppState>, tray_handle: Arc<Mutex<Option<KsniHandle<BroadlinkTray>>>>) -> Self {
         Self {
             state,
             handle: Handle::current(),
+            tray_handle,
         }
     }
 
@@ -76,13 +78,20 @@ impl Tray for BroadlinkTray {
 
         let state = self.state.clone();
         let handle = self.handle.clone();
+        let tray_handle = self.tray_handle.clone();
         items.push(MenuItem::Standard(StandardItem {
             label: "Refresh devices".to_string(),
             activate: Box::new(move |_| {
                 let state = state.clone();
                 let handle = handle.clone();
+                let tray_handle = tray_handle.clone();
                 handle.spawn(async move {
                     state.refresh_devices().await;
+                    if let Ok(h) = tray_handle.lock() {
+                        if let Some(h) = h.as_ref() {
+                            h.update(|_| {});
+                        }
+                    }
                 });
             }),
             ..Default::default()
