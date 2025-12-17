@@ -1,0 +1,15 @@
+# Rust
+target/
+**/target/
+
+# Jetbrains IDEs
+.idea/
+
+# VS Code
+.vscode/
+
+# OS X
+.DS_Store
+
+# Miscellaneous
+.output.txt
