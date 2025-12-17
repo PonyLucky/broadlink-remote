@@ -44,6 +44,16 @@ systemctl --user daemon-reload
 systemctl --user enable --now broadlink-remote.service
 ```
 
+## Update
+
+To update the application to the latest version:
+
+```bash
+make update
+```
+
+This will pull the latest changes, rebuild the binary, reinstall it, and restart the systemd service.
+
 ## Configuration
 
 The application currently expects the Broadlink REST API to be available. (Note: Ensure your REST service host/port matches the defaults in the code or set them via environment variables if implemented).
