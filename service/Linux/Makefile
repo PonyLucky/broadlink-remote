@@ -15,4 +15,10 @@ clean:
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(BINNAME)
 
-.PHONY: all build install clean uninstall
+update:
+	git pull
+	$(MAKE) build
+	sudo $(MAKE) install
+	systemctl --user restart broadlink-remote.service
+
+.PHONY: all build install clean uninstall update
