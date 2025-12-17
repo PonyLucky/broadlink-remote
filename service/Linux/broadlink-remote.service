@@ -1,0 +1,17 @@
+[Unit]
+Description=Broadlink Remote Media Player and System Tray
+Description[fr]=Lecteur multimédia et barre d'état Broadlink Remote
+After=network.target
+
+[Service]
+Type=simple
+# If installed via 'make install', the binary is in /usr/local/bin
+ExecStart=/usr/local/bin/broadlink-remote-linux
+Restart=always
+RestartSec=5
+
+# Provide environment variables if needed
+# Environment=RUST_LOG=info
+
+[Install]
+WantedBy=default.target
