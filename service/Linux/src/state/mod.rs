@@ -4,15 +4,6 @@ use tokio::sync::RwLock;
 use crate::api_client::{BLControllerInfo, BLNode, BLScript, BroadlinkClient};
 use crate::config::{Config, MprisConfig};
 
-#[derive(Clone, Debug)]
-pub struct RecentCommand {
-    pub controller: String,
-    pub device: String,
-    pub device_label: String,
-    pub command_path: String,
-    pub label: String,
-}
-
 pub struct AppState {
     pub client: BroadlinkClient,
     pub controllers: RwLock<Vec<BLControllerInfo>>,
@@ -20,7 +11,6 @@ pub struct AppState {
     pub tree_cache: RwLock<HashMap<String, HashMap<String, BLNode>>>,
     pub is_loading: RwLock<bool>,
     pub selected_controllers: RwLock<HashSet<String>>,
-    pub recent_commands: RwLock<Vec<RecentCommand>>,
     pub tray_icon: RwLock<Option<String>>,
     pub mpris_config: RwLock<MprisConfig>,
 }
@@ -34,7 +24,6 @@ impl AppState {
             tree_cache: RwLock::new(HashMap::new()),
             is_loading: RwLock::new(false),
             selected_controllers: RwLock::new(config.selected_controllers),
-            recent_commands: RwLock::new(Vec::new()),
             tray_icon: RwLock::new(config.tray_icon),
             mpris_config: RwLock::new(config.mpris),
         }
@@ -64,20 +53,6 @@ impl AppState {
         }
     }
 
-    pub async fn add_recent_command(&self, cmd: RecentCommand) {
-        let mut recent = self.recent_commands.write().await;
-        // Remove if already exists to move it to the top
-        recent.retain(|r| !(r.controller == cmd.controller && r.device == cmd.device && r.command_path == cmd.command_path));
-        recent.insert(0, cmd);
-        if recent.len() > 10 {
-            recent.truncate(10);
-        }
-    }
-
-    pub async fn clear_recent_commands(&self) {
-        let mut recent = self.recent_commands.write().await;
-        recent.clear();
-    }
 
     pub async fn refresh_devices(self: Arc<Self>) {
         {

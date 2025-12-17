@@ -1,6 +1,6 @@
 use ksni::{Tray, Handle as KsniHandle};
 use ksni::menu::{MenuItem, StandardItem, SubMenu};
-use crate::state::{AppState, RecentCommand};
+use crate::state::AppState;
 use crate::api_client::{BLNode, BLNodeKind};
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Handle;
@@ -20,7 +20,7 @@ impl BroadlinkTray {
         }
     }
 
-    fn flatten_node(&self, node: &BLNode, controller: &str, device: &str, device_label: &str, prefix: Option<String>, items: &mut Vec<MenuItem<Self>>) {
+    fn flatten_node(&self, node: &BLNode, controller: &str, device: &str, prefix: Option<String>, items: &mut Vec<MenuItem<Self>>) {
         let current_name = node.friendly_name.as_deref().unwrap_or(&node.name).to_string();
         let label = match prefix {
             Some(p) => format!("{} > {}", p, current_name),
@@ -30,18 +30,15 @@ impl BroadlinkTray {
         match node.kind {
             BLNodeKind::Group => {
                 for child in &node.children {
-                    self.flatten_node(child, controller, device, device_label, Some(label.clone()), items);
+                    self.flatten_node(child, controller, device, Some(label.clone()), items);
                 }
             }
             BLNodeKind::Command => {
                 let controller = controller.to_string();
                 let device = device.to_string();
-                let device_label = device_label.to_string();
                 let cmd_path = node.command_path.clone().unwrap_or_default();
                 let state = self.state.clone();
                 let handle = self.handle.clone();
-                let tray_handle = self.tray_handle.clone();
-                let label_clone = label.clone();
                 
                 items.push(MenuItem::Standard(StandardItem {
                     label,
@@ -51,29 +48,13 @@ impl BroadlinkTray {
                         let handle = handle.clone();
                         let controller = controller.clone();
                         let device = device.clone();
-                        let device_label = device_label.clone();
                         let cmd_path = cmd_path.clone();
-                        let tray_handle = tray_handle.clone();
-                        let label = label_clone.clone();
                         
                         // Execute async task from sync callback
                         handle.spawn(async move {
                             match state.client.send_command(&controller, &device, &cmd_path).await {
                                 Ok(true) => {
                                     log::info!("✅ Sent: {}/{}/{}", controller, device, cmd_path);
-                                    state.add_recent_command(RecentCommand {
-                                        controller: controller.clone(),
-                                        device: device.clone(),
-                                        device_label,
-                                        command_path: cmd_path.clone(),
-                                        label,
-                                    }).await;
-                                    // Refresh tray to show updated recents
-                                    if let Ok(h) = tray_handle.lock() {
-                                        if let Some(h) = h.as_ref() {
-                                            h.update(|_| {});
-                                        }
-                                    }
                                 }
                                 Ok(false) => log::warn!("⚠️ Failed to send: {}/{}/{}", controller, device, cmd_path),
                                 Err(e) => log::error!("❌ Error sending command: {}", e),
@@ -94,6 +75,7 @@ impl Tray for BroadlinkTray {
     }
 
     fn menu(&self) -> Vec<MenuItem<Self>> {
+        log::info!("Generating tray menu");
         let mut items = Vec::new();
 
         let state_refresh = self.state.clone();
@@ -119,59 +101,6 @@ impl Tray for BroadlinkTray {
         }));
 
         items.push(MenuItem::Separator);
-
-        // Recent Commands
-        let recent = futures::executor::block_on(self.state.recent_commands.read());
-        if !recent.is_empty() {
-            for rc in recent.iter().take(5) {
-                let rc = rc.clone();
-                let state = self.state.clone();
-                let handle = self.handle.clone();
-                let tray_handle = self.tray_handle.clone();
-                items.push(MenuItem::Standard(StandardItem {
-                    label: format!("★ {} ({})", rc.label, rc.device_label),
-                    activate: Box::new(move |_| {
-                        let state = state.clone();
-                        let handle = handle.clone();
-                        let rc = rc.clone();
-                        let tray_handle = tray_handle.clone();
-                        handle.spawn(async move {
-                            if let Ok(true) = state.client.send_command(&rc.controller, &rc.device, &rc.command_path).await {
-                                log::info!("✅ Recent: {} sent", rc.label);
-                                state.add_recent_command(rc).await;
-                                if let Ok(h) = tray_handle.lock() {
-                                    if let Some(h) = h.as_ref() {
-                                        h.update(|_| {});
-                                    }
-                                }
-                            }
-                        });
-                    }),
-                    ..Default::default()
-                }));
-            }
-            let state_clear = self.state.clone();
-            let handle_clear = self.handle.clone();
-            let tray_handle_clear = self.tray_handle.clone();
-            items.push(MenuItem::Standard(StandardItem {
-                label: "Clear recent".to_string(),
-                activate: Box::new(move |_| {
-                    let state = state_clear.clone();
-                    let handle = handle_clear.clone();
-                    let tray_handle = tray_handle_clear.clone();
-                    handle.spawn(async move {
-                        state.clear_recent_commands().await;
-                        if let Ok(h) = tray_handle.lock() {
-                            if let Some(h) = h.as_ref() {
-                                h.update(|_| {});
-                            }
-                        }
-                    });
-                }),
-                ..Default::default()
-            }));
-            items.push(MenuItem::Separator);
-        }
 
         // Blocking read for menu generation
         let controllers = futures::executor::block_on(self.state.controllers.read());
@@ -260,7 +189,7 @@ impl Tray for BroadlinkTray {
                 for (dev_name, root_node) in dev_map {
                     let mut dev_items = Vec::new();
                     let dev_friendly_name = root_node.friendly_name.clone().unwrap_or_else(|| dev_name.clone());
-                    self.flatten_node(root_node, &ctrl.name, dev_name, &dev_friendly_name, None, &mut dev_items);
+                    self.flatten_node(root_node, &ctrl.name, dev_name, None, &mut dev_items);
                     items.push(MenuItem::SubMenu(SubMenu {
                         label: dev_friendly_name,
                         submenu: dev_items,
