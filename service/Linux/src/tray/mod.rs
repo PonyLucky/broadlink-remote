@@ -89,7 +89,8 @@ impl BroadlinkTray {
 
 impl Tray for BroadlinkTray {
     fn icon_name(&self) -> String {
-        "network-wireless".to_string() // Example icon name
+        let tray_icon = futures::executor::block_on(self.state.tray_icon.read());
+        tray_icon.clone().unwrap_or_else(|| "preferences-desktop-peripherals".to_string())
     }
 
     fn menu(&self) -> Vec<MenuItem<Self>> {

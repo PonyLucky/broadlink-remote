@@ -21,6 +21,7 @@ pub struct AppState {
     pub is_loading: RwLock<bool>,
     pub selected_controllers: RwLock<HashSet<String>>,
     pub recent_commands: RwLock<Vec<RecentCommand>>,
+    pub tray_icon: RwLock<Option<String>>,
     pub mpris_config: RwLock<MprisConfig>,
 }
 
@@ -34,6 +35,7 @@ impl AppState {
             is_loading: RwLock::new(false),
             selected_controllers: RwLock::new(config.selected_controllers),
             recent_commands: RwLock::new(Vec::new()),
+            tray_icon: RwLock::new(config.tray_icon),
             mpris_config: RwLock::new(config.mpris),
         }
     }
@@ -47,12 +49,14 @@ impl AppState {
         }
 
         let mpris = self.mpris_config.read().await;
+        let tray_icon = self.tray_icon.read().await;
 
         // Save config
         let config = Config {
             host: self.client.host().to_string(),
             port: self.client.port(),
             selected_controllers: selected.clone(),
+            tray_icon: tray_icon.clone(),
             mpris: mpris.clone(),
         };
         if let Err(e) = config.save() {

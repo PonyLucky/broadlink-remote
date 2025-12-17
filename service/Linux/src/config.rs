@@ -51,8 +51,13 @@ pub struct Config {
     pub host: String,
     pub port: u16,
     pub selected_controllers: HashSet<String>,
-    #[serde(default)]
+    #[serde(default = "default_tray_icon")]
+    pub tray_icon: Option<String>,
     pub mpris: MprisConfig,
+}
+
+fn default_tray_icon() -> Option<String> {
+    Some("preferences-desktop-peripherals".to_string())
 }
 
 impl Default for Config {
@@ -61,6 +66,7 @@ impl Default for Config {
             host: "192.168.1.143".to_string(),
             port: 6676,
             selected_controllers: HashSet::new(),
+            tray_icon: Some("preferences-desktop-peripherals".to_string()),
             mpris: MprisConfig::default(),
         }
     }
@@ -157,7 +163,44 @@ mod tests {
         assert!(path.exists());
         let content = fs::read_to_string(&path).unwrap();
         assert!(content.contains("192.168.1.143")); // default host
+        assert!(content.contains("preferences-desktop-peripherals")); // default tray icon
 
+        // Cleanup
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_load_existing_config_without_tray_icon_populates_it() {
+        let mut path = std::env::temp_dir();
+        path.push("broadlink_test_config_missing_field.json");
+        
+        // Config without tray_icon
+        let json = r#"{
+            "host": "1.2.3.4",
+            "port": 1234,
+            "selected_controllers": [],
+            "mpris": {
+                "enable": false,
+                "controller": "",
+                "device": "",
+                "commands": {
+                    "play-pause": "",
+                    "previous": "",
+                    "next": ""
+                }
+            }
+        }"#;
+        fs::write(&path, json).unwrap();
+
+        let config = Config::load_from_path(path.clone()).unwrap();
+        
+        // Now it should be populated because of #[serde(default = "default_tray_icon")]
+        assert_eq!(config.tray_icon, Some("preferences-desktop-peripherals".to_string())); 
+        
+        // Also verify it was saved back to the file
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("preferences-desktop-peripherals"));
+        
         // Cleanup
         let _ = fs::remove_file(path);
     }
