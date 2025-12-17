@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
 use std::time::Duration;
-use log::{error, warn};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BLControllerInfo {

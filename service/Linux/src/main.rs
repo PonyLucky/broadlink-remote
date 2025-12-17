@@ -4,10 +4,8 @@ mod tray;
 mod state;
 
 use std::sync::Arc;
-use tokio::runtime::Runtime;
 use crate::state::AppState;
 use crate::tray::BroadlinkTray;
-use ksni::Handle;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -43,8 +41,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start System Tray
     let tray = BroadlinkTray::new(state.clone());
-    let tray_handle = Handle::new(tray);
-    tray_handle.spawn();
+    let tray_service = ksni::TrayService::new(tray);
+    tray_service.spawn();
 
     log::info!("Broadlink Remote is running");
 

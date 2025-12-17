@@ -1,4 +1,5 @@
-use ksni::{Tray, MenuItem, menu};
+use ksni::Tray;
+use ksni::menu::{MenuItem, StandardItem, SubMenu};
 use crate::state::AppState;
 use crate::api_client::{BLNode, BLNodeKind};
 use std::sync::Arc;
@@ -22,7 +23,11 @@ impl BroadlinkTray {
                 for child in &node.children {
                     sub_items.push(self.build_node_menu(child, controller, device));
                 }
-                MenuItem::SubMenu(title, sub_items)
+                MenuItem::SubMenu(SubMenu {
+                    label: title,
+                    submenu: sub_items,
+                    ..Default::default()
+                })
             }
             BLNodeKind::Command => {
                 let controller = controller.to_string();
@@ -30,7 +35,7 @@ impl BroadlinkTray {
                 let cmd_path = node.command_path.clone().unwrap_or_default();
                 let state = self.state.clone();
                 
-                MenuItem::Standard {
+                MenuItem::Standard(StandardItem {
                     label: title,
                     enabled: !node.disabled,
                     activate: Box::new(move |_| {
@@ -49,7 +54,7 @@ impl BroadlinkTray {
                         });
                     }),
                     ..Default::default()
-                }
+                })
             }
         }
     }
@@ -64,7 +69,7 @@ impl Tray for BroadlinkTray {
         let mut items = Vec::new();
 
         let state = self.state.clone();
-        items.push(MenuItem::Standard {
+        items.push(MenuItem::Standard(StandardItem {
             label: "Refresh devices".to_string(),
             activate: Box::new(move |_| {
                 let state = state.clone();
@@ -73,14 +78,14 @@ impl Tray for BroadlinkTray {
                 });
             }),
             ..Default::default()
-        });
+        }));
 
         items.push(MenuItem::Separator);
 
         // Blocking read for menu generation (ksni calls this from its own thread)
-        let controllers = futures_util::executor::block_on(self.state.controllers.read());
-        let scripts_cache = futures_util::executor::block_on(self.state.scripts_cache.read());
-        let tree_cache = futures_util::executor::block_on(self.state.tree_cache.read());
+        let controllers = futures::executor::block_on(self.state.controllers.read());
+        let scripts_cache = futures::executor::block_on(self.state.scripts_cache.read());
+        let tree_cache = futures::executor::block_on(self.state.tree_cache.read());
 
         for ctrl in controllers.iter() {
             let mut ctrl_items = Vec::new();
@@ -92,7 +97,7 @@ impl Tray for BroadlinkTray {
                     let controller = ctrl.name.clone();
                     let script_name = script.name.clone();
                     let state = self.state.clone();
-                    script_items.push(MenuItem::Standard {
+                    script_items.push(MenuItem::Standard(StandardItem {
                         label: script.friendly_name.clone().unwrap_or_else(|| script.name.clone()),
                         activate: Box::new(move |_| {
                             let state = state.clone();
@@ -105,10 +110,14 @@ impl Tray for BroadlinkTray {
                             });
                         }),
                         ..Default::default()
-                    });
+                    }));
                 }
                 if !script_items.is_empty() {
-                    ctrl_items.push(MenuItem::SubMenu("Scripts".to_string(), script_items));
+                    ctrl_items.push(MenuItem::SubMenu(SubMenu {
+                        label: "Scripts".to_string(),
+                        submenu: script_items,
+                        ..Default::default()
+                    }));
                     ctrl_items.push(MenuItem::Separator);
                 }
             }
@@ -120,15 +129,19 @@ impl Tray for BroadlinkTray {
                 }
             }
 
-            items.push(MenuItem::SubMenu(ctrl.friendly_name.clone().unwrap_or_else(|| ctrl.name.clone()), ctrl_items));
+            items.push(MenuItem::SubMenu(SubMenu {
+                label: ctrl.friendly_name.clone().unwrap_or_else(|| ctrl.name.clone()),
+                submenu: ctrl_items,
+                ..Default::default()
+            }));
         }
 
         items.push(MenuItem::Separator);
-        items.push(MenuItem::Standard {
+        items.push(MenuItem::Standard(StandardItem {
             label: "Quit".to_string(),
             activate: Box::new(|_| std::process::exit(0)),
             ..Default::default()
-        });
+        }));
 
         items
     }
