@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         initial_state.refresh_devices().await;
         log::info!("Initial device refresh complete");
-        initial_tray_handle.update(|_| {});
+        initial_tray_handle.update(|tray| tray.update_menu());
     });
 
     log::info!("Broadlink Remote is running");
