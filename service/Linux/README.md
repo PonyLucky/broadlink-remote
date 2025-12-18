@@ -19,6 +19,20 @@ A lightweight Linux port of the Broadlink Remote application, originally written
 
 ## Installation
 
+### Option A: Download from Release (Recommended)
+
+1. Download the latest binary and `.service` file from the [Releases](http://192.168.1.143:3000/PonyLucky/BroadlinkRemote/releases/latest) page.
+2. Install the binary:
+   ```bash
+   sudo make install-binary BINARY=./broadlink-remote-linux
+   ```
+3. Install the service:
+   ```bash
+   make install-service
+   ```
+
+### Option B: Build from source
+
 ### 1. Build the project
 ```bash
 make build
@@ -38,10 +52,7 @@ sudo make install
 To have the application start automatically when you log in:
 
 ```bash
-mkdir -p ~/.config/systemd/user/
-cp broadlink-remote.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now broadlink-remote.service
+make install-service
 ```
 
 ## Update
@@ -56,7 +67,45 @@ This will pull the latest changes, rebuild the binary, reinstall it, and restart
 
 ## Configuration
 
-The application currently expects the Broadlink REST API to be available. (Note: Ensure your REST service host/port matches the defaults in the code or set them via environment variables if implemented).
+The application stores its configuration in a JSON file located at:
+`~/.config/broadlink-remote/config.json`
+
+This file is automatically created with default values on the first run.
+
+### Configuration Fields
+
+- **`host`**: The IP address or hostname of your Broadlink REST API service (Default: `192.168.1.143`).
+- **`port`**: The port number of the Broadlink REST API service (Default: `6676`).
+- **`selected_controllers`**: A list of controller names that should be visible in the tray menu.
+- **`tray_icon`**: The name of the icon to use in the system tray (Default: `preferences-desktop-peripherals`).
+- **`mpris`**: Settings for MPRIS2 integration:
+    - **`enable`**: Boolean to enable/disable the virtual media player.
+    - **`controller`**: The Broadlink controller to use for MPRIS commands.
+    - **`device`**: The device to control via MPRIS.
+    - **`commands`**: Mapping for media keys (`play-pause`, `previous`, `next`) to specific device commands.
+
+### Example Configuration
+
+```json
+{
+  "host": "192.168.1.143",
+  "port": 6676,
+  "selected_controllers": [
+    "Living Room"
+  ],
+  "tray_icon": "preferences-desktop-peripherals",
+  "mpris": {
+    "enable": true,
+    "controller": "Living Room",
+    "device": "TV",
+    "commands": {
+      "play-pause": "Power",
+      "previous": "Volume Down",
+      "next": "Volume Up"
+    }
+  }
+}
+```
 
 ## Developer Notes
 
