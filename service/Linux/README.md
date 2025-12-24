@@ -33,7 +33,7 @@ A lightweight Linux port of the Broadlink Remote application, originally written
    BINNAME = broadlink-remote-linux
    BINARY = ./broadlink-remote-linux  # name of the binary to install
    # Install command
-   install -D -m 755 $(BINARY) $(DESTDIR)$(PREFIX)/bin/$(BINNAME)
+   sudo install -D -m 755 $(BINARY) $(DESTDIR)$(PREFIX)/bin/$(BINNAME)
    ```
 3. Install the service:
    ```bash
