@@ -26,9 +26,25 @@ A lightweight Linux port of the Broadlink Remote application, originally written
    ```bash
    sudo make install-binary BINARY=./broadlink-remote-linux
    ```
+   Or:
+   ```bash
+   # Variables
+   PREFIX ?= /usr/local
+   BINNAME = broadlink-remote-linux
+   BINARY = ./broadlink-remote-linux  # name of the binary to install
+   # Install command
+   install -D -m 755 $(BINARY) $(DESTDIR)$(PREFIX)/bin/$(BINNAME)
+   ```
 3. Install the service:
    ```bash
    make install-service
+   ```
+   Or:
+   ```bash
+   mkdir -p $(HOME)/.config/systemd/user/
+   cp broadlink-remote.service $(HOME)/.config/systemd/user/
+   systemctl --user daemon-reload
+   systemctl --user enable --now broadlink-remote.service
    ```
 
 ### Option B: Build from source
