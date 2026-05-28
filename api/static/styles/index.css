@@ -166,7 +166,8 @@ header {
   border-radius: 6px;
 }
 .segmented .seg-btn:focus {
-  outline: none !important;
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 1px;
 }
 .segmented .sep { color: var(--sep); }
 
