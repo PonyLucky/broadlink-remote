@@ -24,6 +24,9 @@ make start
 # Development (run without building first)
 make dev
 
+# Clean build artifacts
+make clean
+
 # Install for current user
 make install
 
