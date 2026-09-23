@@ -55,7 +55,7 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),    // Tab bar (controller tabs)
+            Constraint::Length(2),    // Tab bar (controller tabs)
             Constraint::Min(10),      // Main content
             Constraint::Length(1),    // Status bar
             Constraint::Length(1),    // Help bar
@@ -98,6 +98,8 @@ pub fn render(frame: &mut Frame, state: &AppState) {
         Span::raw("/"),
         Span::styled("hl", key_style),
         Span::raw(" Back/Enter | "),
+        Span::styled("Tab", key_style),
+        Span::raw(" Next Ctrl | "),
         Span::styled("d", key_style),
         Span::raw(" Controllers | "),
         Span::styled("s", key_style),

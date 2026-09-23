@@ -207,6 +207,10 @@ impl AppState {
                     self.selected_index = 0;
                 }
             }
+            crossterm::event::KeyCode::Tab | crossterm::event::KeyCode::Char('\t') => {
+                // Switch to next controller
+                self.switch_to_next_controller();
+            }
             _ => {}
         }
     }
@@ -338,6 +342,22 @@ impl AppState {
             }
             _ => {}
         }
+    }
+
+    fn switch_to_next_controller(&mut self) {
+        if self.controllers.is_empty() {
+            return;
+        }
+        let current_idx = match &self.current_view {
+            View::Devices(ctrl) | View::Commands(ctrl, _) | View::Scripts(ctrl) | View::CommandTree(ctrl, _) => {
+                self.controllers.iter().position(|c| c.name == *ctrl).unwrap_or(0)
+            }
+            _ => 0,
+        };
+        let next_idx = (current_idx + 1) % self.controllers.len();
+        let next_ctrl = &self.controllers[next_idx];
+        self.current_view = View::Devices(next_ctrl.name.clone());
+        self.selected_index = 0;
     }
 
     pub fn get_devices_for_controller(&self, controller: &str) -> Vec<crate::api_client::BLDeviceInfo> {
