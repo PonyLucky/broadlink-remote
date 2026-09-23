@@ -24,8 +24,13 @@ make start
 # Development (run without building first)
 make dev
 
-# Install system-wide
+# Install for current user
 make install
+
+# Run using installed binary
+broadlink-remote-tui
+# or use the short alias
+br
 ```
 
 ## Controls

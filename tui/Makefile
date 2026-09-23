@@ -16,4 +16,6 @@ clean:
 	cargo clean
 
 install: build
-	install -D -m 755 ./target/release/broadlink-remote-tui $(DESTDIR)/usr/local/bin/broadlink-remote-tui
+	mkdir -p $(HOME)/.local/bin
+	install -m 755 ./target/release/broadlink-remote-tui $(HOME)/.local/bin/broadlink-remote-tui
+	ln -sf $(HOME)/.local/bin/broadlink-remote-tui $(HOME)/.local/bin/br
