@@ -1,4 +1,5 @@
 use ratatui::Frame;
+use ratatui::text::{Span, Line};
 use ratatui::layout::{Layout, Direction, Constraint, Rect};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Clear, Tabs};
 use ratatui::style::{Style, Color, Modifier};
@@ -87,8 +88,26 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     frame.render_widget(status, chunks[2]);
 
     // Help bar with navigation legend
-    let help = Paragraph::new("↑↓/jk Nav | ←→/hl Back/Enter | d Controllers | s Scripts | r Refresh | q Quit")
-        .style(Style::default().fg(Color::Gray));
+    let key_style = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+    let help = Paragraph::new(Line::from(vec![
+        Span::styled("↑↓", key_style),
+        Span::raw("/"),
+        Span::styled("jk", key_style),
+        Span::raw(" Nav | "),
+        Span::styled("←→", key_style),
+        Span::raw("/"),
+        Span::styled("hl", key_style),
+        Span::raw(" Back/Enter | "),
+        Span::styled("d", key_style),
+        Span::raw(" Controllers | "),
+        Span::styled("s", key_style),
+        Span::raw(" Scripts | "),
+        Span::styled("r", key_style),
+        Span::raw(" Refresh | "),
+        Span::styled("q", key_style),
+        Span::raw(" Quit"),
+    ]))
+    .style(Style::default().fg(Color::Gray));
     frame.render_widget(help, chunks[3]);
 
     // Render controllers popup if open
@@ -121,7 +140,7 @@ fn render_controllers_popup(frame: &mut Frame, state: &AppState) {
             .title("Controllers (press Enter to switch)")
             .borders(Borders::ALL)
             .style(Style::default().bg(Color::Black)))
-        .highlight_style(Style::default().bg(Color::Blue).fg(Color::White))
+        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
     frame.render_stateful_widget(list, popup_area, &mut ListState::default().with_selected(Some(state.controllers_popup_index)));
@@ -139,7 +158,7 @@ fn render_controllers(frame: &mut Frame, state: &AppState, area: ratatui::layout
         .block(Block::default()
             .title("Controllers")
             .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
-        .highlight_style(Style::default().bg(Color::Blue).fg(Color::White))
+        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
     frame.render_stateful_widget(list, area, &mut ListState::default().with_selected(Some(state.selected_index)));
@@ -156,7 +175,7 @@ fn render_devices(frame: &mut Frame, state: &AppState, controller: &str, area: r
         .block(Block::default()
             .title(get_view_title(&state.current_view, state))
             .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
-        .highlight_style(Style::default().bg(Color::Blue).fg(Color::White))
+        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
     frame.render_stateful_widget(list, area, &mut ListState::default().with_selected(Some(state.selected_index)));
@@ -182,7 +201,7 @@ fn render_commands(frame: &mut Frame, state: &AppState, controller: &str, device
         .block(Block::default()
             .title(get_view_title(&state.current_view, state))
             .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
-        .highlight_style(Style::default().bg(Color::Blue).fg(Color::White))
+        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
     frame.render_stateful_widget(list, area, &mut ListState::default().with_selected(Some(state.selected_index)));
@@ -200,7 +219,7 @@ fn render_scripts(frame: &mut Frame, state: &AppState, controller: &str, area: r
         .block(Block::default()
             .title(get_view_title(&state.current_view, state))
             .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
-        .highlight_style(Style::default().bg(Color::Blue).fg(Color::White))
+        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
     frame.render_stateful_widget(list, area, &mut ListState::default().with_selected(Some(state.selected_index)));
