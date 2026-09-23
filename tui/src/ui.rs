@@ -2,8 +2,7 @@ use ratatui::Frame;
 use ratatui::layout::{Layout, Direction, Constraint, Rect};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Clear, Tabs};
 use ratatui::style::{Style, Color, Modifier};
-use crate::state::{AppState, View};
-use crate::api_client::BLNodeKind;
+use crate::state::{AppState, View, CommandListItem};
 
 fn get_view_title(view: &View, state: &AppState) -> String {
     match view {
@@ -164,21 +163,22 @@ fn render_devices(frame: &mut Frame, state: &AppState, controller: &str, area: r
 }
 
 fn render_commands(frame: &mut Frame, state: &AppState, controller: &str, device: &str, area: ratatui::layout::Rect) {
-    // Build flat list of commands from tree
-    let mut commands = Vec::new();
-    if let Some(trees) = state.tree_cache.get(controller) {
-        if let Some(root) = trees.get(device) {
-            collect_commands(root, &mut commands);
+    let items = state.get_commands_for_device(controller, device);
+    let list_items: Vec<ListItem> = items.iter().map(|item| {
+        match item {
+            CommandListItem::Command(node) => {
+                let name = state.get_command_display_name(node);
+                let prefix = if node.disabled { "[disabled] " } else { "" };
+                ListItem::new(format!("{}{}", prefix, name))
+            }
+            CommandListItem::Header(header) => {
+                ListItem::new(format!("─── {} ───", header))
+                    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+            }
         }
-    }
-
-    let items: Vec<ListItem> = commands.iter().map(|node| {
-        let name = state.get_command_display_name(node);
-        let prefix = if node.disabled { "[disabled] " } else { "" };
-        ListItem::new(format!("{}{}", prefix, name))
     }).collect();
 
-    let list = List::new(items)
+    let list = List::new(list_items)
         .block(Block::default()
             .title(get_view_title(&state.current_view, state))
             .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
@@ -186,15 +186,6 @@ fn render_commands(frame: &mut Frame, state: &AppState, controller: &str, device
         .highlight_symbol(">> ");
 
     frame.render_stateful_widget(list, area, &mut ListState::default().with_selected(Some(state.selected_index)));
-}
-
-fn collect_commands(node: &crate::api_client::BLNode, commands: &mut Vec<crate::api_client::BLNode>) {
-    if node.kind == BLNodeKind::Command {
-        commands.push(node.clone());
-    }
-    for child in &node.children {
-        collect_commands(child, commands);
-    }
 }
 
 fn render_scripts(frame: &mut Frame, state: &AppState, controller: &str, area: ratatui::layout::Rect) {

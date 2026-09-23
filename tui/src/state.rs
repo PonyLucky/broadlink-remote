@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::api_client::{BLControllerInfo, BLNode, BLScript, BLDeviceInfo, BroadlinkClient};
+use crate::api_client::{BLControllerInfo, BLNode, BLScript, BLDeviceInfo, BroadlinkClient, BLNodeKind};
 use crate::config::Config;
 
 pub struct AppState {
@@ -27,6 +27,12 @@ pub enum View {
     Commands(String, String), // controller, device
     Scripts(String),      // controller name
     CommandTree(String, String), // controller, device
+}
+
+#[derive(Debug, Clone)]
+pub enum CommandListItem {
+    Command(BLNode),
+    Header(String),
 }
 
 impl AppState {
@@ -96,6 +102,48 @@ impl AppState {
         self.status_time.elapsed().as_secs() < 3
     }
 
+    fn find_first_command_index(&self, controller: &str, device: &str) -> usize {
+        let items = self.get_commands_for_device(controller, device);
+        for (i, item) in items.iter().enumerate() {
+            if let CommandListItem::Command(_) = item {
+                return i;
+            }
+        }
+        0
+    }
+
+    fn navigate_up(&mut self) {
+        if let View::Commands(ctrl, dev) = &self.current_view {
+            let items = self.get_commands_for_device(ctrl, dev);
+            let mut idx = self.selected_index;
+            while idx > 0 {
+                idx -= 1;
+                if let CommandListItem::Command(_) = &items[idx] {
+                    self.selected_index = idx;
+                    return;
+                }
+            }
+        } else if self.selected_index > 0 {
+            self.selected_index -= 1;
+        }
+    }
+
+    fn navigate_down(&mut self) {
+        if let View::Commands(ctrl, dev) = &self.current_view {
+            let items = self.get_commands_for_device(ctrl, dev);
+            let mut idx = self.selected_index;
+            while idx < items.len() - 1 {
+                idx += 1;
+                if let CommandListItem::Command(_) = &items[idx] {
+                    self.selected_index = idx;
+                    return;
+                }
+            }
+        } else {
+            self.selected_index += 1;
+        }
+    }
+
     pub async fn handle_key(&mut self, key: crossterm::event::KeyEvent) {
         // If controllers popup is open, handle its navigation
         if self.show_controllers_popup {
@@ -106,12 +154,10 @@ impl AppState {
         match key.code {
             // Arrow keys
             crossterm::event::KeyCode::Up => {
-                if self.selected_index > 0 {
-                    self.selected_index -= 1;
-                }
+                self.navigate_up();
             }
             crossterm::event::KeyCode::Down => {
-                self.selected_index += 1;
+                self.navigate_down();
             }
             crossterm::event::KeyCode::Left => {
                 self.handle_back();
@@ -121,12 +167,10 @@ impl AppState {
             }
             // Vim-like navigation
             crossterm::event::KeyCode::Char('j') => {
-                self.selected_index += 1;
+                self.navigate_down();
             }
             crossterm::event::KeyCode::Char('k') => {
-                if self.selected_index > 0 {
-                    self.selected_index -= 1;
-                }
+                self.navigate_up();
             }
             crossterm::event::KeyCode::Char('h') => {
                 self.handle_back();
@@ -205,26 +249,30 @@ impl AppState {
                 let devices = self.get_devices_for_controller(ctrl_name);
                 if self.selected_index < devices.len() {
                     let dev = &devices[self.selected_index];
-                    self.current_view = View::Commands(ctrl_name.clone(), dev.name.clone());
-                    self.selected_index = 0;
+                    let dev_name = dev.name.clone();
+                    // Find first command index before changing view
+                    let first_cmd_idx = self.find_first_command_index(ctrl_name, &dev_name);
+                    self.current_view = View::Commands(ctrl_name.clone(), dev_name);
+                    self.selected_index = first_cmd_idx;
                 }
             }
             View::Commands(ctrl_name, dev_name) => {
                 // Find the command node and execute it
-                if let Some(cmd_path) = self.get_command_path_at_index(ctrl_name, dev_name, self.selected_index) {
-                    let result = self.client.send_command(ctrl_name, dev_name, &cmd_path).await;
-                    match result {
-                        Ok(success) => {
-                            if success {
-                                let cmd_node = self.get_command_node_at_index(ctrl_name, dev_name, self.selected_index);
-                                let cmd_display = cmd_node.map(|n| self.get_command_display_name(&n)).unwrap_or(cmd_path.clone());
-                                self.set_status(&format!("Command sent: {}", cmd_display));
-                            } else {
-                                self.set_status("Command failed");
+                if let Some(cmd_node) = self.get_command_at_index(ctrl_name, dev_name, self.selected_index) {
+                    if let Some(cmd_path) = &cmd_node.command_path {
+                        let result = self.client.send_command(ctrl_name, dev_name, cmd_path).await;
+                        match result {
+                            Ok(success) => {
+                                if success {
+                                    let cmd_display = self.get_command_display_name(&cmd_node);
+                                    self.set_status(&format!("Command sent: {}", cmd_display));
+                                } else {
+                                    self.set_status("Command failed");
+                                }
                             }
-                        }
-                        Err(e) => {
-                            self.set_status(&format!("Error: {}", e));
+                            Err(e) => {
+                                self.set_status(&format!("Error: {}", e));
+                            }
                         }
                     }
                 }
@@ -287,34 +335,37 @@ impl AppState {
         self.devices_cache.get(controller).cloned().unwrap_or_default()
     }
 
-    fn get_command_path_at_index(&self, controller: &str, device: &str, index: usize) -> Option<String> {
-        if let Some(node) = self.get_command_node_at_index(controller, device, index) {
-            node.command_path.clone()
-        } else {
-            None
-        }
-    }
-
-    fn get_command_node_at_index(&self, controller: &str, device: &str, index: usize) -> Option<BLNode> {
+    pub fn get_commands_for_device(&self, controller: &str, device: &str) -> Vec<CommandListItem> {
+        let mut items = Vec::new();
         if let Some(trees) = self.tree_cache.get(controller) {
             if let Some(root) = trees.get(device) {
-                let mut count = 0;
-                return self.find_command_node_by_index(root, index, &mut count);
+                self.collect_commands_with_headers(root, &mut items);
             }
         }
-        None
+        items
     }
 
-    fn find_command_node_by_index(&self, node: &BLNode, target_index: usize, count: &mut usize) -> Option<BLNode> {
-        if node.kind == crate::api_client::BLNodeKind::Command {
-            if *count == target_index {
-                return Some(node.clone());
+    fn collect_commands_with_headers(&self, node: &BLNode, items: &mut Vec<CommandListItem>) {
+        if node.kind == BLNodeKind::Command {
+            items.push(CommandListItem::Command(node.clone()));
+        } else if node.kind == BLNodeKind::Group {
+            // Add group header
+            let header_name = node.friendly_name.clone().unwrap_or_else(|| node.name.clone());
+            items.push(CommandListItem::Header(header_name));
+            // Recurse into group
+            for child in &node.children {
+                self.collect_commands_with_headers(child, items);
             }
-            *count += 1;
         }
-        for child in &node.children {
-            if let Some(result) = self.find_command_node_by_index(child, target_index, count) {
-                return Some(result);
+    }
+
+    pub fn get_command_at_index(&self, controller: &str, device: &str, index: usize) -> Option<BLNode> {
+        let items = self.get_commands_for_device(controller, device);
+        for (i, item) in items.iter().enumerate() {
+            if i == index {
+                if let CommandListItem::Command(node) = item {
+                    return Some(node.clone());
+                }
             }
         }
         None
