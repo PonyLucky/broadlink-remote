@@ -1,6 +1,10 @@
 .idea/
 .env
 
+# Rust
+target/
+Cargo.lock
+
 # API
 .venv/
 __pycache__/
