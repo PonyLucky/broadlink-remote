@@ -157,7 +157,7 @@ fn render_controllers(frame: &mut Frame, state: &AppState, area: ratatui::layout
     let list = List::new(items)
         .block(Block::default()
             .title("Controllers")
-            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
+            .borders(Borders::ALL))
         .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
@@ -174,7 +174,7 @@ fn render_devices(frame: &mut Frame, state: &AppState, controller: &str, area: r
     let list = List::new(items)
         .block(Block::default()
             .title(get_view_title(&state.current_view, state))
-            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
+            .borders(Borders::ALL))
         .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
@@ -200,7 +200,7 @@ fn render_commands(frame: &mut Frame, state: &AppState, controller: &str, device
     let list = List::new(list_items)
         .block(Block::default()
             .title(get_view_title(&state.current_view, state))
-            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
+            .borders(Borders::ALL))
         .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
@@ -218,7 +218,7 @@ fn render_scripts(frame: &mut Frame, state: &AppState, controller: &str, area: r
     let list = List::new(items)
         .block(Block::default()
             .title(get_view_title(&state.current_view, state))
-            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
+            .borders(Borders::ALL))
         .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
@@ -230,6 +230,6 @@ fn render_command_tree(frame: &mut Frame, _state: &AppState, controller: &str, d
     let paragraph = Paragraph::new(text)
         .block(Block::default()
             .title(format!("Tree - {}/{}", controller, device))
-            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT));
+            .borders(Borders::ALL));
     frame.render_widget(paragraph, area);
 }
