@@ -8,22 +8,30 @@ use crate::state::{AppState, View, CommandListItem};
 fn get_view_title(view: &View, state: &AppState) -> String {
     match view {
         View::Controllers => "Controllers".to_string(),
-        View::Devices(ctrl) => {
-            let friendly = state.controllers.iter()
-                .find(|c| c.name == *ctrl)
-                .and_then(|c| c.friendly_name.clone())
-                .unwrap_or_else(|| ctrl.clone());
-            format!("Devices - {}", friendly)
-        }
-        View::Commands(ctrl, dev) => {
-            let dev_friendly = state.get_devices_for_controller(ctrl).iter()
-                .find(|d| d.name == *dev)
-                .and_then(|d| d.friendly_name.clone())
+        View::Devices(_) => "Devices".to_string(),
+        View::Commands(_, dev) => {
+            let dev_friendly = state.controllers.iter()
+                .find_map(|c| {
+                    state.get_devices_for_controller(&c.name)
+                        .iter()
+                        .find(|d| d.name == *dev)
+                        .and_then(|d| d.friendly_name.clone())
+                })
                 .unwrap_or_else(|| dev.clone());
-            format!("Commands - {}/{}", ctrl, dev_friendly)
+            format!("Commands - {}", dev_friendly)
         }
-        View::Scripts(ctrl) => format!("Scripts - {}", ctrl),
-        View::CommandTree(ctrl, dev) => format!("Tree - {}/{}", ctrl, dev),
+        View::Scripts(_) => "Scripts".to_string(),
+        View::CommandTree(_, dev) => {
+            let dev_friendly = state.controllers.iter()
+                .find_map(|c| {
+                    state.get_devices_for_controller(&c.name)
+                        .iter()
+                        .find(|d| d.name == *dev)
+                        .and_then(|d| d.friendly_name.clone())
+                })
+                .unwrap_or_else(|| dev.clone());
+            format!("Tree - {}", dev_friendly)
+        }
     }
 }
 
@@ -227,11 +235,12 @@ fn render_scripts(frame: &mut Frame, state: &AppState, controller: &str, area: r
     frame.render_stateful_widget(list, area, &mut ListState::default().with_selected(Some(state.selected_index)));
 }
 
-fn render_command_tree(frame: &mut Frame, _state: &AppState, controller: &str, device: &str, area: ratatui::layout::Rect) {
+fn render_command_tree(frame: &mut Frame, state: &AppState, controller: &str, device: &str, area: ratatui::layout::Rect) {
     let text = "Command tree view";
+    let title = get_view_title(&View::CommandTree(controller.to_string(), device.to_string()), state);
     let paragraph = Paragraph::new(text)
         .block(Block::default()
-            .title(format!("Tree - {}/{}", controller, device))
+            .title(title)
             .borders(Borders::ALL));
     frame.render_widget(paragraph, area);
 }
