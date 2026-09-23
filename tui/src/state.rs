@@ -17,6 +17,7 @@ pub struct AppState {
     pub status_time: std::time::Instant,
     pub show_controllers_popup: bool,
     pub controllers_popup_index: usize,
+    pub device_selection: HashMap<String, usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,6 +52,7 @@ impl AppState {
             status_time: std::time::Instant::now(),
             show_controllers_popup: false,
             controllers_popup_index: 0,
+            device_selection: HashMap::new(),
         }
     }
 
@@ -250,6 +252,8 @@ impl AppState {
                 if self.selected_index < devices.len() {
                     let dev = &devices[self.selected_index];
                     let dev_name = dev.name.clone();
+                    // Save device selection before entering commands view
+                    self.device_selection.insert(ctrl_name.clone(), self.selected_index);
                     // Find first command index before changing view
                     let first_cmd_idx = self.find_first_command_index(ctrl_name, &dev_name);
                     self.current_view = View::Commands(ctrl_name.clone(), dev_name);
@@ -320,8 +324,13 @@ impl AppState {
                 self.selected_index = 0;
             }
             View::Commands(ctrl_name, _) | View::CommandTree(ctrl_name, _) => {
-                self.current_view = View::Devices(ctrl_name.clone());
-                self.selected_index = 0;
+                let ctrl = ctrl_name.clone();
+                self.current_view = View::Devices(ctrl.clone());
+                if let Some(&idx) = self.device_selection.get(&ctrl) {
+                    self.selected_index = idx;
+                } else {
+                    self.selected_index = 0;
+                }
             }
             View::Scripts(ctrl_name) => {
                 self.current_view = View::Devices(ctrl_name.clone());
@@ -347,14 +356,20 @@ impl AppState {
 
     fn collect_commands_with_headers(&self, node: &BLNode, items: &mut Vec<CommandListItem>) {
         if node.kind == BLNodeKind::Command {
-            items.push(CommandListItem::Command(node.clone()));
+            if !node.disabled {
+                items.push(CommandListItem::Command(node.clone()));
+            }
         } else if node.kind == BLNodeKind::Group {
-            // Add group header
-            let header_name = node.friendly_name.clone().unwrap_or_else(|| node.name.clone());
-            items.push(CommandListItem::Header(header_name));
-            // Recurse into group
+            // Collect commands from this group first
+            let mut group_items = Vec::new();
             for child in &node.children {
-                self.collect_commands_with_headers(child, items);
+                self.collect_commands_with_headers(child, &mut group_items);
+            }
+            // Only add header if group has commands
+            if !group_items.is_empty() {
+                let header_name = node.friendly_name.clone().unwrap_or_else(|| node.name.clone());
+                items.push(CommandListItem::Header(header_name));
+                items.extend(group_items);
             }
         }
     }
