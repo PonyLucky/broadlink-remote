@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::api_client::{BLControllerInfo, BLNode, BLScript, BroadlinkClient};
+use crate::api_client::{BLControllerInfo, BLNode, BLScript, BLDeviceInfo, BroadlinkClient};
 use crate::config::Config;
 
 pub struct AppState {
@@ -7,6 +7,7 @@ pub struct AppState {
     pub controllers: Vec<BLControllerInfo>,
     pub scripts_cache: HashMap<String, Vec<BLScript>>,
     pub tree_cache: HashMap<String, HashMap<String, BLNode>>,
+    pub devices_cache: HashMap<String, Vec<BLDeviceInfo>>,
     pub is_loading: bool,
     pub selected_controllers: std::collections::HashSet<String>,
     // TUI state
@@ -35,6 +36,7 @@ impl AppState {
             controllers: Vec::new(),
             scripts_cache: HashMap::new(),
             tree_cache: HashMap::new(),
+            devices_cache: HashMap::new(),
             is_loading: false,
             selected_controllers: config.selected_controllers,
             current_view: View::Controllers, // Will be set to first device after refresh
@@ -53,12 +55,15 @@ impl AppState {
         let ctrls = self.client.fetch_controllers().await.unwrap_or_default();
         let mut new_scripts = HashMap::new();
         let mut new_trees = HashMap::new();
+        let mut new_devices = HashMap::new();
 
         for ctrl in &ctrls {
             let scripts = self.client.fetch_scripts(&ctrl.name).await.unwrap_or_default();
             new_scripts.insert(ctrl.name.clone(), scripts);
 
             let devs = self.client.fetch_devices(&ctrl.name).await.unwrap_or_default();
+            new_devices.insert(ctrl.name.clone(), devs.clone());
+
             let mut dev_map = HashMap::new();
             for dev in devs {
                 if let Ok(tree) = self.client.fetch_command_tree(&ctrl.name, &dev.name).await {
@@ -71,6 +76,7 @@ impl AppState {
         self.controllers = ctrls;
         self.scripts_cache = new_scripts;
         self.tree_cache = new_trees;
+        self.devices_cache = new_devices;
         self.is_loading = false;
         self.set_status("Devices loaded");
 
@@ -210,7 +216,9 @@ impl AppState {
                     match result {
                         Ok(success) => {
                             if success {
-                                self.set_status(&format!("Command sent: {}", cmd_path));
+                                let cmd_node = self.get_command_node_at_index(ctrl_name, dev_name, self.selected_index);
+                                let cmd_display = cmd_node.map(|n| self.get_command_display_name(&n)).unwrap_or(cmd_path.clone());
+                                self.set_status(&format!("Command sent: {}", cmd_display));
                             } else {
                                 self.set_status("Command failed");
                             }
@@ -225,11 +233,12 @@ impl AppState {
                 if let Some(scripts) = self.scripts_cache.get(ctrl_name) {
                     if self.selected_index < scripts.len() {
                         let script = &scripts[self.selected_index];
+                        let script_display = script.friendly_name.clone().unwrap_or_else(|| script.name.clone());
                         let result = self.client.run_script(ctrl_name, &script.name).await;
                         match result {
                             Ok(success) => {
                                 if success {
-                                    self.set_status(&format!("Script executed: {}", script.name));
+                                    self.set_status(&format!("Script executed: {}", script_display));
                                 } else {
                                     self.set_status("Script failed");
                                 }
@@ -275,44 +284,37 @@ impl AppState {
     }
 
     pub fn get_devices_for_controller(&self, controller: &str) -> Vec<crate::api_client::BLDeviceInfo> {
-        if let Some(ctrl) = self.controllers.iter().find(|c| c.name == controller) {
-            if let Some(device_names) = &ctrl.devices {
-                let mut devices = Vec::new();
-                for name in device_names {
-                    devices.push(crate::api_client::BLDeviceInfo {
-                        name: name.clone(),
-                        friendly_name: None,
-                        r#type: String::new(),
-                        manufacturer: None,
-                        model: None,
-                    });
-                }
-                return devices;
-            }
-        }
-        Vec::new()
+        self.devices_cache.get(controller).cloned().unwrap_or_default()
     }
 
     fn get_command_path_at_index(&self, controller: &str, device: &str, index: usize) -> Option<String> {
+        if let Some(node) = self.get_command_node_at_index(controller, device, index) {
+            node.command_path.clone()
+        } else {
+            None
+        }
+    }
+
+    fn get_command_node_at_index(&self, controller: &str, device: &str, index: usize) -> Option<BLNode> {
         if let Some(trees) = self.tree_cache.get(controller) {
             if let Some(root) = trees.get(device) {
                 let mut count = 0;
-                return self.find_command_by_index(root, index, &mut count);
+                return self.find_command_node_by_index(root, index, &mut count);
             }
         }
         None
     }
 
-    fn find_command_by_index(&self, node: &BLNode, target_index: usize, count: &mut usize) -> Option<String> {
+    fn find_command_node_by_index(&self, node: &BLNode, target_index: usize, count: &mut usize) -> Option<BLNode> {
         if node.kind == crate::api_client::BLNodeKind::Command {
             if *count == target_index {
-                return node.command_path.clone();
+                return Some(node.clone());
             }
             *count += 1;
         }
         for child in &node.children {
-            if let Some(path) = self.find_command_by_index(child, target_index, count) {
-                return Some(path);
+            if let Some(result) = self.find_command_node_by_index(child, target_index, count) {
+                return Some(result);
             }
         }
         None

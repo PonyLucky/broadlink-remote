@@ -4,19 +4,28 @@ A terminal UI for controlling Broadlink remote devices. Implements the same API 
 
 ## Features
 
-- Browse and control Broadlink devices from the terminal
-- Navigate device command trees
-- Execute commands and scripts
+- Browse controllers, devices, and commands in a tree structure
+- Friendly names displayed for controllers, devices, commands, and scripts (falls back to ID)
+- Execute commands by selecting them and pressing Enter
+- Run scripts
+- Multi-controller support with tab switching
+- Vim-like keyboard navigation (h/j/k/l)
 - Configuration shared with the system tray tool (`~/.config/broadlink-remote/config.json`)
 
 ## Usage
 
 ```bash
 # Build
-cargo build --release
+make build
 
 # Run
-./target/release/broadlink-remote-tui
+make start
+
+# Development (run without building first)
+make dev
+
+# Install system-wide
+make install
 ```
 
 ## Controls
