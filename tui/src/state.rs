@@ -312,20 +312,8 @@ impl AppState {
 
     fn handle_back(&mut self) {
         match &self.current_view {
-            View::Devices(ctrl_name) => {
-                // Go to previous controller's devices, or wrap to last
-                let idx = self.controllers.iter().position(|c| c.name == *ctrl_name);
-                if let Some(i) = idx {
-                    if i > 0 {
-                        self.current_view = View::Devices(self.controllers[i - 1].name.clone());
-                    } else {
-                        // Wrap to last controller
-                        if let Some(last) = self.controllers.last() {
-                            self.current_view = View::Devices(last.name.clone());
-                        }
-                    }
-                }
-                self.selected_index = 0;
+            View::Devices(_) => {
+                // Do nothing - already at top level for this controller
             }
             View::Commands(ctrl_name, _) | View::CommandTree(ctrl_name, _) => {
                 let ctrl = ctrl_name.clone();
