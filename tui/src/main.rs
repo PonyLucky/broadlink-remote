@@ -48,6 +48,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     terminal.show_cursor()?;
+    crossterm::execute!(
+        terminal.backend_mut(),
+        crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
+        crossterm::cursor::MoveTo(0, 0)
+    )?;
     crossterm::terminal::disable_raw_mode()?;
 
     Ok(())
