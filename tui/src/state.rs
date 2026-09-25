@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use crate::api_client::{BLControllerInfo, BLNode, BLScript, BLDeviceInfo, BroadlinkClient, BLNodeKind};
-use crate::config::Config;
+use crate::config::TuiConfig;
 
 pub struct AppState {
     pub client: BroadlinkClient,
@@ -10,6 +10,7 @@ pub struct AppState {
     pub devices_cache: HashMap<String, Vec<BLDeviceInfo>>,
     pub is_loading: bool,
     pub selected_controllers: std::collections::HashSet<String>,
+    pub last_selected_controller: String,
     // TUI state
     pub current_view: View,
     pub selected_index: usize,
@@ -37,7 +38,7 @@ pub enum CommandListItem {
 }
 
 impl AppState {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: TuiConfig) -> Self {
         Self {
             client: BroadlinkClient::new(config.host, config.port),
             controllers: Vec::new(),
@@ -46,6 +47,7 @@ impl AppState {
             devices_cache: HashMap::new(),
             is_loading: false,
             selected_controllers: config.selected_controllers,
+            last_selected_controller: config.last_selected_controller,
             current_view: View::Controllers, // Will be set to first device after refresh
             selected_index: 0,
             status_message: String::new(),
@@ -88,8 +90,19 @@ impl AppState {
         self.is_loading = false;
         self.set_status("Devices loaded");
 
-        // Auto-navigate to first controller's devices view
-        if let Some(first_ctrl) = self.controllers.first() {
+        // Navigate to last selected controller, or first if none saved
+        let target_controller = if !self.last_selected_controller.is_empty() {
+            self.controllers.iter()
+                .find(|c| c.name == self.last_selected_controller)
+                .map(|c| c.name.clone())
+        } else {
+            None
+        };
+
+        if let Some(ctrl_name) = target_controller {
+            self.current_view = View::Devices(ctrl_name);
+            self.selected_index = 0;
+        } else if let Some(first_ctrl) = self.controllers.first() {
             self.current_view = View::Devices(first_ctrl.name.clone());
             self.selected_index = 0;
         }
@@ -231,7 +244,9 @@ impl AppState {
                 if self.controllers_popup_index < self.controllers.len() {
                     let ctrl = &self.controllers[self.controllers_popup_index];
                     self.current_view = View::Devices(ctrl.name.clone());
+                    self.last_selected_controller = ctrl.name.clone();
                     self.selected_index = 0;
+                    self.save_tui_config();
                 }
                 self.show_controllers_popup = false;
             }
@@ -345,7 +360,21 @@ impl AppState {
         let next_idx = (current_idx + 1) % self.controllers.len();
         let next_ctrl = &self.controllers[next_idx];
         self.current_view = View::Devices(next_ctrl.name.clone());
+        self.last_selected_controller = next_ctrl.name.clone();
         self.selected_index = 0;
+        self.save_tui_config();
+    }
+
+    fn save_tui_config(&self) {
+        let config = TuiConfig {
+            host: self.client.host.clone(),
+            port: self.client.port,
+            selected_controllers: self.selected_controllers.clone(),
+            last_selected_controller: self.last_selected_controller.clone(),
+        };
+        if let Err(e) = config.save() {
+            log::debug!("Failed to save TUI config: {}", e);
+        }
     }
 
     pub fn get_devices_for_controller(&self, controller: &str) -> Vec<crate::api_client::BLDeviceInfo> {

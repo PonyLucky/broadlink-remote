@@ -9,8 +9,9 @@ A terminal UI for controlling Broadlink remote devices. Implements the same API 
 - Execute commands by selecting them and pressing Enter
 - Run scripts
 - Multi-controller support with tab switching
+- Controller selection persisted across sessions
 - Vim-like keyboard navigation (h/j/k/l)
-- Configuration shared with the system tray tool (`~/.config/broadlink-remote/config.json`)
+- Configuration in `~/.config/broadlink-remote/config-tui.json` (auto-created)
 
 ## Usage
 
@@ -48,23 +49,14 @@ br
 
 ## Configuration
 
-Same config file as the system tray tool: `~/.config/broadlink-remote/config.json`
+The TUI uses its own config file at `~/.config/broadlink-remote/config-tui.json`, which is automatically created on first run if it doesn't exist. The currently selected controller is saved when you switch controllers (Tab or controller view selection).
 
 ```json
 {
   "host": "192.168.1.143",
   "port": 6676,
-  "selected_controllers": [],
-  "tray_icon": "preferences-desktop-peripherals",
-  "mpris": {
-    "enable": false,
-    "controller": "",
-    "device": "",
-    "commands": {
-      "play-pause": "",
-      "previous": "",
-      "next": ""
-    }
-  }
+  "selected_controllers": []
 }
 ```
+
+The service's main config file (`~/.config/broadlink-remote/config.json`) is separate and contains additional settings like MPRIS and tray icon.

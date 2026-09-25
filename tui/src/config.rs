@@ -3,6 +3,74 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::fs;
 
+// TUI-specific config (simplified, no MPRIS)
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TuiConfig {
+    pub host: String,
+    pub port: u16,
+    #[serde(default)]
+    pub selected_controllers: HashSet<String>,
+    #[serde(default)]
+    pub last_selected_controller: String,
+}
+
+impl Default for TuiConfig {
+    fn default() -> Self {
+        Self {
+            host: "192.168.1.143".to_string(),
+            port: 6676,
+            selected_controllers: HashSet::new(),
+            last_selected_controller: String::new(),
+        }
+    }
+}
+
+impl TuiConfig {
+    pub fn get_path() -> PathBuf {
+        let mut path = home::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        path.push(".config");
+        path.push("broadlink-remote");
+        path.push("config-tui.json");
+        path
+    }
+
+    pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
+        let path = Self::get_path();
+        log::debug!("Loading TUI config from {:?}", path);
+        if !path.exists() {
+            log::debug!("TUI config file not found. Creating default at {:?}", path);
+            let config = Self::default();
+            config.save()?;
+            return Ok(config);
+        }
+
+        let content = fs::read_to_string(&path)?;
+        let config = match serde_json::from_str::<Self>(&content) {
+            Ok(config) => {
+                log::debug!("Loaded TUI config from {:?}", path);
+                config
+            }
+            Err(e) => {
+                let msg = format!("Failed to parse TUI config file at {:?}: {}", path, e);
+                log::error!("{}", msg);
+                return Err(msg.into());
+            }
+        };
+        Ok(config)
+    }
+
+    pub fn save(&self) -> std::io::Result<()> {
+        let path = Self::get_path();
+        log::debug!("Saving TUI config to {:?}", path);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let content = serde_json::to_string_pretty(self).unwrap();
+        fs::write(&path, content)
+    }
+}
+
+// Full service config (kept for reference)
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MprisCommands {
     #[serde(default, rename = "play-pause")]
@@ -72,6 +140,7 @@ impl Default for Config {
     }
 }
 
+#[allow(dead_code)]
 impl Config {
     pub fn get_path() -> PathBuf {
         let mut path = home::home_dir().unwrap_or_else(|| PathBuf::from("."));

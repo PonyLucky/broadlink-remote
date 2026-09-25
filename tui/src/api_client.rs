@@ -60,8 +60,8 @@ pub enum BLNodeKind {
 }
 
 pub struct BroadlinkClient {
-    host: String,
-    port: u16,
+    pub host: String,
+    pub port: u16,
     client: Client,
 }
 
